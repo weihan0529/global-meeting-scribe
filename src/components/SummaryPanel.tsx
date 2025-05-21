@@ -1,4 +1,5 @@
 
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import TaskItem from "./TaskItem";
@@ -28,14 +29,26 @@ const SummaryPanel = ({
       <div className="p-4 border-b">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-bold">Live Summary</h2>
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-sm py-1 px-2"
-            onClick={onAddTask}
-          >
-            + Add Task
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-sm py-1 px-2"
+              onClick={onAddTask}
+            >
+              + Add Task
+            </Button>
+            {tasks.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-sm py-1 px-2"
+                asChild
+              >
+                <Link to="/tasks">View All Tasks</Link>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -81,7 +94,7 @@ const SummaryPanel = ({
                 </h3>
                 <div className="space-y-2">
                   {tasks.map((task) => (
-                    <TaskItem key={task.id} task={task} />
+                    <TaskItem key={task.id} task={task} linkToTaskManager={true} />
                   ))}
                 </div>
               </div>

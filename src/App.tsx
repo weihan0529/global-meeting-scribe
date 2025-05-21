@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Meeting from "./pages/Meeting";
 import Summary from "./pages/Summary";
+import TaskManager from "./pages/TaskManager";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/meeting" element={<Meeting />} />
           <Route path="/summary/:id" element={<Summary />} />
+          <Route path="/tasks" element={<TaskManager />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

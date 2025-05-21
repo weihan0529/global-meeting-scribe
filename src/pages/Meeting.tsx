@@ -11,8 +11,8 @@ import SummaryPanel from "@/components/SummaryPanel";
 const sampleMessages = [
   {
     id: "1",
-    speaker: "Jane Smith",
-    speakerInitials: "JS",
+    speaker: "Speaker 1",
+    speakerInitials: "S1",
     text: "Welcome everyone to our product planning meeting. Today we'll discuss the roadmap for Q2.",
     translatedText: "Bienvenidos a todos a nuestra reunión de planificación de productos. Hoy discutiremos la hoja de ruta para el segundo trimestre.",
     timestamp: new Date(Date.now() - 1000 * 60 * 5),
@@ -20,8 +20,8 @@ const sampleMessages = [
   },
   {
     id: "2",
-    speaker: "Mark Johnson",
-    speakerInitials: "MJ",
+    speaker: "Speaker 2",
+    speakerInitials: "S2",
     text: "Thanks Jane. I've prepared some slides about the new features we're planning to launch.",
     translatedText: "Gracias Jane. He preparado algunas diapositivas sobre las nuevas funciones que planeamos lanzar.",
     timestamp: new Date(Date.now() - 1000 * 60 * 4),
@@ -29,8 +29,8 @@ const sampleMessages = [
   },
   {
     id: "3",
-    speaker: "Sarah Williams",
-    speakerInitials: "SW",
+    speaker: "Speaker 3",
+    speakerInitials: "S3",
     text: "That sounds great. I'm particularly interested in the mobile app enhancements.",
     translatedText: "Eso suena genial. Estoy particularmente interesada en las mejoras de la aplicación móvil.",
     timestamp: new Date(Date.now() - 1000 * 60 * 3),
@@ -38,8 +38,8 @@ const sampleMessages = [
   },
   {
     id: "4",
-    speaker: "Mark Johnson",
-    speakerInitials: "MJ",
+    speaker: "Speaker 2",
+    speakerInitials: "S2",
     text: "Yes, we're planning to add offline mode and dark theme support based on user feedback.",
     translatedText: "Sí, estamos planeando añadir modo sin conexión y soporte para tema oscuro según los comentarios de los usuarios.",
     timestamp: new Date(Date.now() - 1000 * 60 * 2),
@@ -47,8 +47,8 @@ const sampleMessages = [
   },
   {
     id: "5",
-    speaker: "Jane Smith",
-    speakerInitials: "JS",
+    speaker: "Speaker 1",
+    speakerInitials: "S1",
     text: "Perfect. We should also discuss the timeline for these features. I think we need to prioritize the offline mode.",
     translatedText: "Perfecto. También deberíamos discutir el cronograma para estas funciones. Creo que debemos priorizar el modo sin conexión.",
     timestamp: new Date(Date.now() - 1000 * 60 * 1),
@@ -146,6 +146,53 @@ const Meeting = () => {
     }, 1500);
   };
 
+  const handleSpeakerNameChange = (messageId: string, newName: string) => {
+    // Update the current message with the new speaker name
+    const updatedMessages = messages.map(message => {
+      if (message.id === messageId) {
+        // Generate new initials from the new name
+        const initials = newName
+          .split(' ')
+          .map(part => part.charAt(0))
+          .join('')
+          .toUpperCase()
+          .substring(0, 2);
+          
+        return { 
+          ...message, 
+          speaker: newName,
+          speakerInitials: initials
+        };
+      }
+      
+      // Also update all other messages from the same speaker (identified by old speaker name)
+      const changedMessage = messages.find(m => m.id === messageId);
+      if (changedMessage && message.speaker === changedMessage.speaker && message.id !== messageId) {
+        const initials = newName
+          .split(' ')
+          .map(part => part.charAt(0))
+          .join('')
+          .toUpperCase()
+          .substring(0, 2);
+          
+        return { 
+          ...message, 
+          speaker: newName,
+          speakerInitials: initials
+        };
+      }
+      
+      return message;
+    });
+    
+    setMessages(updatedMessages);
+    
+    toast({
+      title: "Speaker renamed",
+      description: `Speaker has been renamed to "${newName}".`,
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
@@ -186,7 +233,8 @@ const Meeting = () => {
             <div className="h-full overflow-hidden">
               <TranscriptionPanel 
                 messages={messages} 
-                onLanguageChange={handleSourceLanguageChange} 
+                onLanguageChange={handleSourceLanguageChange}
+                onSpeakerNameChange={handleSpeakerNameChange}
               />
             </div>
             <div className="h-full overflow-hidden">

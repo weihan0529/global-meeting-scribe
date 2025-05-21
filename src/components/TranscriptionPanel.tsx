@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import EditableSpeakerName from "./EditableSpeakerName";
 
 interface Message {
   id: string;
@@ -23,6 +24,7 @@ interface Message {
 interface TranscriptionPanelProps {
   messages: Message[];
   onLanguageChange: (language: string) => void;
+  onSpeakerNameChange?: (messageId: string, newName: string) => void;
 }
 
 const speakerColors = [
@@ -36,6 +38,7 @@ const speakerColors = [
 const TranscriptionPanel = ({
   messages = [],
   onLanguageChange,
+  onSpeakerNameChange,
 }: TranscriptionPanelProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [sourceLanguage, setSourceLanguage] = useState("en");
@@ -50,6 +53,12 @@ const TranscriptionPanel = ({
   const handleLanguageChange = (value: string) => {
     setSourceLanguage(value);
     onLanguageChange(value);
+  };
+
+  const handleSpeakerNameChange = (messageId: string, newName: string) => {
+    if (onSpeakerNameChange) {
+      onSpeakerNameChange(messageId, newName);
+    }
   };
 
   return (
@@ -84,18 +93,12 @@ const TranscriptionPanel = ({
               return (
                 <div key={message.id} className="space-y-1">
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center">
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center mr-2 ${message.color || "bg-gray-400"}`}
-                      >
-                        <span className="text-xs text-white font-medium">
-                          {message.speakerInitials}
-                        </span>
-                      </div>
-                      <span className={`font-medium ${speakerColors[index % speakerColors.length]}`}>
-                        {message.speaker}
-                      </span>
-                    </div>
+                    <EditableSpeakerName
+                      speakerName={message.speaker}
+                      speakerInitials={message.speakerInitials}
+                      color={message.color}
+                      onNameChange={(newName) => handleSpeakerNameChange(message.id, newName)}
+                    />
                     <span className="text-xs text-muted-foreground">
                       {formattedTime}
                     </span>
