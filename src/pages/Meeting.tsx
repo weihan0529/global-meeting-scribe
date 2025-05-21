@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -70,13 +71,13 @@ const sampleTasks = [
   {
     id: "1",
     text: "Prepare offline mode technical specifications",
-    assignee: "Mark Johnson",
+    assignee: "Speaker 1",
     deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2), // 2 days from now
   },
   {
     id: "2",
     text: "Schedule user testing sessions for dark theme",
-    assignee: "Sarah Williams",
+    assignee: "Speaker 2",
     deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5), // 5 days from now
   },
 ];
@@ -91,6 +92,15 @@ const Meeting = () => {
   const [tasks, setTasks] = useState(sampleTasks);
   const [meetingTitle, setMeetingTitle] = useState("Product Planning Meeting");
   const { toast } = useToast();
+
+  // Transform messages into speakers list
+  const speakers = messages.reduce((acc: { id: string, name: string }[], message) => {
+    const existingSpeaker = acc.find(s => s.name === message.speaker);
+    if (!existingSpeaker) {
+      acc.push({ id: message.id, name: message.speaker });
+    }
+    return acc;
+  }, []);
 
   const toggleRecording = () => {
     setIsRecording(!isRecording);
@@ -107,7 +117,7 @@ const Meeting = () => {
     const newTask = {
       id: newTaskId,
       text: "New task - click to edit",
-      assignee: "Unassigned",
+      assignee: speakers.length > 0 ? speakers[0].name : "Unassigned",
       deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3), // 3 days from now
     };
     
@@ -115,6 +125,17 @@ const Meeting = () => {
     toast({
       title: "Task added",
       description: "New task has been added to action items.",
+    });
+  };
+
+  const handleTaskUpdate = (updatedTask: any) => {
+    setTasks(tasks.map(task => 
+      task.id === updatedTask.id ? updatedTask : task
+    ));
+    
+    toast({
+      title: "Task updated",
+      description: "Task has been updated successfully.",
     });
   };
 
@@ -187,6 +208,19 @@ const Meeting = () => {
     });
     
     setMessages(updatedMessages);
+    
+    // Also update any tasks assigned to this speaker
+    const changedMessage = messages.find(m => m.id === messageId);
+    if (changedMessage) {
+      const oldSpeakerName = changedMessage.speaker;
+      
+      setTasks(prevTasks => prevTasks.map(task => {
+        if (task.assignee === oldSpeakerName) {
+          return { ...task, assignee: newName };
+        }
+        return task;
+      }));
+    }
     
     toast({
       title: "Speaker renamed",
@@ -262,7 +296,9 @@ const Meeting = () => {
                 keyPoints={keyPoints}
                 decisions={decisions}
                 tasks={tasks}
+                speakers={speakers}
                 onAddTask={handleAddTask}
+                onTaskUpdate={handleTaskUpdate}
               />
             </div>
           </div>
