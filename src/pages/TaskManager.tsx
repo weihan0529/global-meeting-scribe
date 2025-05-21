@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { Check, CalendarIcon, ArrowUp, ArrowDown } from "lucide-react";
+import { Check, CalendarIcon, ArrowUp, ArrowDown, Pen } from "lucide-react";
 import {
   Table,
   TableBody,
