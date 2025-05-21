@@ -67,13 +67,22 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           <Card className="md:col-span-2">
             <CardContent className="pt-6">
-              <h2 className="text-xl font-bold mb-4">Start a Meeting</h2>
-              <Button 
-                className="w-full sm:w-auto btn-primary"
-                onClick={handleStartNewMeeting}
-              >
-                Start New Meeting
-              </Button>
+              <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
+              <div className="flex gap-4">
+                <Button 
+                  className="w-full sm:w-auto btn-primary"
+                  onClick={handleStartNewMeeting}
+                >
+                  Start New Meeting
+                </Button>
+                <Button 
+                  onClick={() => navigate("/tasks")}
+                  variant="secondary" 
+                  className="w-full sm:w-auto"
+                >
+                  Task Manager
+                </Button>
+              </div>
             </CardContent>
           </Card>
           
@@ -100,27 +109,6 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
-          
-          <div className="md:col-span-3">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Quick Actions</h2>
-            </div>
-            <div className="flex gap-4">
-              <Button 
-                onClick={() => navigate("/meeting")}
-                className="flex-1 md:flex-none"
-              >
-                New Meeting
-              </Button>
-              <Button 
-                onClick={() => navigate("/tasks")} 
-                variant="secondary"
-                className="flex-1 md:flex-none"
-              >
-                Task Manager
-              </Button>
-            </div>
-          </div>
         </div>
         
         <div>
