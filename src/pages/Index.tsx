@@ -52,7 +52,14 @@ const Index = () => {
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold text-primary mb-2">MeetingLingo</h1>
+            <div className="flex justify-center mb-4">
+              <img 
+                src="/lovable-uploads/b89c5324-4f8c-41b5-8773-d90385700b53.png" 
+                alt="Unisono Logo" 
+                className="h-16 w-16" 
+              />
+            </div>
+            <h1 className="text-3xl font-bold text-primary mb-2">Unisono</h1>
             <p className="text-muted-foreground">
               AI-powered multilingual meeting assistant
             </p>

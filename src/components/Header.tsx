@@ -27,12 +27,14 @@ const Header = ({ showLanguageToggle = true }: HeaderProps) => {
     <header className="bg-white border-b border-gray-200 py-3 px-4 sm:px-6 flex items-center justify-between">
       <div className="flex items-center">
         <Link to="/dashboard" className="flex items-center">
-          <div className="bg-primary rounded-lg w-8 h-8 flex items-center justify-center mr-2">
-            <span className="text-white font-bold">M</span>
-          </div>
+          <img 
+            src="/lovable-uploads/b89c5324-4f8c-41b5-8773-d90385700b53.png" 
+            alt="Unisono Logo" 
+            className="h-8 w-8 mr-2" 
+          />
           {!isMobile && (
             <span className="text-xl font-roboto font-bold text-primary">
-              MeetingLingo
+              Unisono
             </span>
           )}
         </Link>
