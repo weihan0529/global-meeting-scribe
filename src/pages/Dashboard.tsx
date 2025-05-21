@@ -1,9 +1,7 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
@@ -52,28 +50,11 @@ const recentMeetings = [
 ];
 
 const Dashboard = () => {
-  const [meetingCode, setMeetingCode] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleStartNewMeeting = () => {
     navigate("/meeting");
-  };
-
-  const handleJoinMeeting = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (meetingCode.trim() === "") {
-      toast({
-        variant: "destructive",
-        title: "Meeting code required",
-        description: "Please enter a valid meeting code.",
-      });
-      return;
-    }
-    
-    // In a real app, validate the meeting code first
-    navigate(`/meeting?code=${meetingCode}`);
   };
 
   return (
@@ -86,30 +67,13 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
           <Card className="md:col-span-2">
             <CardContent className="pt-6">
-              <h2 className="text-xl font-bold mb-4">Start or Join a Meeting</h2>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  className="flex-1 btn-primary"
-                  onClick={handleStartNewMeeting}
-                >
-                  Start New Meeting
-                </Button>
-                
-                <form 
-                  className="flex flex-1 gap-2" 
-                  onSubmit={handleJoinMeeting}
-                >
-                  <Input
-                    placeholder="Enter meeting code"
-                    value={meetingCode}
-                    onChange={(e) => setMeetingCode(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button type="submit">
-                    Join
-                  </Button>
-                </form>
-              </div>
+              <h2 className="text-xl font-bold mb-4">Start a Meeting</h2>
+              <Button 
+                className="w-full sm:w-auto btn-primary"
+                onClick={handleStartNewMeeting}
+              >
+                Start New Meeting
+              </Button>
             </CardContent>
           </Card>
           
@@ -136,6 +100,27 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+          
+          <div className="md:col-span-3">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Quick Actions</h2>
+            </div>
+            <div className="flex gap-4">
+              <Button 
+                onClick={() => navigate("/meeting")}
+                className="flex-1 md:flex-none"
+              >
+                New Meeting
+              </Button>
+              <Button 
+                onClick={() => navigate("/tasks")} 
+                variant="secondary"
+                className="flex-1 md:flex-none"
+              >
+                Task Manager
+              </Button>
+            </div>
+          </div>
         </div>
         
         <div>

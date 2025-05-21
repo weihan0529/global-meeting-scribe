@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
+import EditableTitle from "@/components/EditableTitle";
 import TranscriptionPanel from "@/components/TranscriptionPanel";
 import TranslationPanel from "@/components/TranslationPanel";
 import SummaryPanel from "@/components/SummaryPanel";
@@ -89,6 +89,7 @@ const Meeting = () => {
   const [keyPoints, setKeyPoints] = useState(sampleKeyPoints);
   const [decisions, setDecisions] = useState(sampleDecisions);
   const [tasks, setTasks] = useState(sampleTasks);
+  const [meetingTitle, setMeetingTitle] = useState("Product Planning Meeting");
   const { toast } = useToast();
 
   const toggleRecording = () => {
@@ -193,6 +194,14 @@ const Meeting = () => {
     });
   };
 
+  const handleTitleChange = (newTitle: string) => {
+    setMeetingTitle(newTitle);
+    toast({
+      title: "Title updated",
+      description: "Meeting title has been updated successfully.",
+    });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
@@ -201,7 +210,11 @@ const Meeting = () => {
         <div className="border-b bg-muted/30 p-4">
           <div className="container max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
             <div>
-              <h1 className="font-bold text-xl">Product Planning Meeting</h1>
+              <EditableTitle 
+                title={meetingTitle} 
+                className="font-bold text-xl" 
+                onTitleChange={handleTitleChange}
+              />
               <p className="text-sm text-muted-foreground">
                 Started at {new Date().toLocaleTimeString()} · {messages.length} messages
               </p>

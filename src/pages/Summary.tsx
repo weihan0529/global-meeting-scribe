@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,8 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import Header from "@/components/Header";
 import TaskItem from "@/components/TaskItem";
+import EditableTitle from "@/components/EditableTitle";
 
-// Sample data
+// Sample data with additional tasks
 const meetingData = {
   id: "new",
   title: "Product Planning Meeting",
@@ -51,6 +51,18 @@ const meetingData = {
       assignee: "Jane Smith",
       deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 1),
     },
+    {
+      id: "4",
+      text: "Prepare design mockups for dark theme",
+      assignee: "Alex Chen",
+      deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3),
+    },
+    {
+      id: "5",
+      text: "Document API requirements for offline synchronization",
+      assignee: "Mark Johnson",
+      deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 4),
+    },
   ],
   transcript: [
     {
@@ -74,6 +86,7 @@ const meetingData = {
 
 const Summary = () => {
   const [activeTab, setActiveTab] = useState("summary");
+  const [title, setTitle] = useState(meetingData.title);
   const { toast } = useToast();
 
   const handleExport = (format: string) => {
@@ -87,6 +100,14 @@ const Summary = () => {
     toast({
       title: `Sharing to ${platform}`,
       description: `Meeting summary will be shared to ${platform}.`,
+    });
+  };
+
+  const handleTitleChange = (newTitle: string) => {
+    setTitle(newTitle);
+    toast({
+      title: "Title updated",
+      description: "Meeting title has been updated successfully.",
     });
   };
 
@@ -104,7 +125,11 @@ const Summary = () => {
               <span className="text-muted-foreground">/</span>
               <span className="text-sm">Meeting Summary</span>
             </div>
-            <h1 className="text-3xl font-bold">{meetingData.title}</h1>
+            <EditableTitle
+              title={title}
+              className="text-3xl font-bold"
+              onTitleChange={handleTitleChange}
+            />
             <div className="text-sm text-muted-foreground mt-1">
               {meetingData.date.toLocaleString()} · {meetingData.duration} minutes
             </div>
@@ -178,10 +203,15 @@ const Summary = () => {
             
             <Card>
               <CardContent className="pt-6">
-                <h3 className="text-lg font-bold mb-3 text-accent">Action Items</h3>
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-lg font-bold text-accent">Action Items</h3>
+                  <Link to="/tasks">
+                    <Button variant="outline" size="sm">View All Tasks</Button>
+                  </Link>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 max-h-64 overflow-y-auto pr-2">
                   {meetingData.tasks.map((task) => (
-                    <TaskItem key={task.id} task={task} />
+                    <TaskItem key={task.id} task={task} linkToTaskManager={true} />
                   ))}
                 </div>
               </CardContent>
