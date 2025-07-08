@@ -139,13 +139,6 @@ const Meeting = () => {
     });
   };
 
-  const handleSourceLanguageChange = (lang: string) => {
-    setSourceLanguage(lang);
-    toast({
-      title: "Source language changed",
-      description: `Now transcribing in ${lang.toUpperCase()}.`,
-    });
-  };
 
   const handleTargetLanguageChange = (lang: string) => {
     setTargetLanguage(lang);
@@ -280,7 +273,6 @@ const Meeting = () => {
             <div className="h-full overflow-hidden">
               <TranscriptionPanel 
                 messages={messages} 
-                onLanguageChange={handleSourceLanguageChange}
                 onSpeakerNameChange={handleSpeakerNameChange}
               />
             </div>

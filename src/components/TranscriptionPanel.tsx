@@ -23,7 +23,6 @@ interface Message {
 
 interface TranscriptionPanelProps {
   messages: Message[];
-  onLanguageChange: (language: string) => void;
   onSpeakerNameChange?: (messageId: string, newName: string) => void;
 }
 
@@ -37,11 +36,9 @@ const speakerColors = [
 
 const TranscriptionPanel = ({
   messages = [],
-  onLanguageChange,
   onSpeakerNameChange,
 }: TranscriptionPanelProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [sourceLanguage, setSourceLanguage] = useState("en");
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -50,10 +47,6 @@ const TranscriptionPanel = ({
     }
   }, [messages]);
 
-  const handleLanguageChange = (value: string) => {
-    setSourceLanguage(value);
-    onLanguageChange(value);
-  };
 
   const handleSpeakerNameChange = (messageId: string, newName: string) => {
     if (onSpeakerNameChange) {
@@ -64,22 +57,7 @@ const TranscriptionPanel = ({
   return (
     <div className="flex flex-col h-full border-r">
       <div className="p-4 border-b">
-        <h2 className="text-lg font-bold mb-3">Transcription</h2>
-        <div className="flex justify-between">
-          <Select value={sourceLanguage} onValueChange={handleLanguageChange}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Source Language" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="es">Spanish</SelectItem>
-              <SelectItem value="fr">French</SelectItem>
-              <SelectItem value="de">German</SelectItem>
-              <SelectItem value="zh">Chinese</SelectItem>
-              <SelectItem value="ja">Japanese</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <h2 className="text-lg font-bold">Transcription</h2>
       </div>
 
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
@@ -103,7 +81,9 @@ const TranscriptionPanel = ({
                       {formattedTime}
                     </span>
                   </div>
-                  <p className="text-sm pl-8">{message.text}</p>
+                  <p className="text-sm pl-8">
+                    {message.text} <span className="text-xs text-muted-foreground">(English)</span>
+                  </p>
                   {index < messages.length - 1 && (
                     <Separator className="my-2" />
                   )}
