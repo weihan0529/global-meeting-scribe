@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Transcript } from "@/types";
 
+
 interface Message {
   id: string;
   speaker: string;
@@ -21,6 +22,7 @@ interface Message {
   translatedText: string;
   timestamp: Date;
   color: string;
+
 }
 
 interface TranslationPanelProps {
@@ -60,6 +62,7 @@ const TranslationPanel = ({
             <SelectItem value="es">Spanish</SelectItem>
             <SelectItem value="fr">French</SelectItem>
             <SelectItem value="zh">Chinese</SelectItem>
+
           </SelectContent>
         </Select>
       </div>

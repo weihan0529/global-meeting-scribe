@@ -69,12 +69,14 @@ const TranscriptionPanel = ({
     });
   }, [messages]);
 
+
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
 
   const handleSpeakerNameChange = (messageId: string, newName: string) => {
     if (onSpeakerNameChange) {
@@ -96,6 +98,7 @@ const TranscriptionPanel = ({
               const minutes = message.timestamp.getMinutes();
               const formattedTime = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
               const color = speakerColors[message.speaker] || 'text-gray-600';
+
               return (
                 <div key={message.id} className="space-y-1">
                   <div className="flex justify-between items-center">
@@ -103,6 +106,7 @@ const TranscriptionPanel = ({
                       speakerName={message.speaker}
                       speakerInitials={message.speakerInitials}
                       color={color}
+
                       onNameChange={(newName) => handleSpeakerNameChange(message.id, newName)}
                     />
                     <span className="text-xs text-muted-foreground">
