@@ -11,6 +11,7 @@ import SummaryPanel from "@/components/SummaryPanel";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle, Mic, MicOff, Wifi, WifiOff } from "lucide-react";
 
+
 // Sample data for the demo
 const sampleMessages = [
   {
@@ -132,7 +133,6 @@ const Meeting = () => {
       assignee: (insight.data as any).assignee || 'Unassigned',
       deadline: (insight.data as any).due_date ? new Date((insight.data as any).due_date) : new Date(Date.now() + 1000 * 60 * 60 * 24 * 3),
     }));
-
   // Transform messages into speakers list
   const speakers = messages.reduce((acc: { id: string, name: string }[], message) => {
     const existingSpeaker = acc.find(s => s.name === message.speaker);
@@ -162,6 +162,7 @@ const Meeting = () => {
     toast({
       title: "Task management",
       description: "Tasks are now managed automatically by AI insights.",
+
     });
   };
 
@@ -182,12 +183,11 @@ const Meeting = () => {
     });
   };
 
-
-
   const handleSpeakerNameChange = (messageId: string, newName: string) => {
     toast({
       title: "Speaker management",
       description: "Speaker names are now managed automatically by AI diarization.",
+
     });
   };
 
@@ -254,6 +254,7 @@ const Meeting = () => {
                   Share
                 </Button>
               </div>
+
             </div>
           </div>
         </div>
