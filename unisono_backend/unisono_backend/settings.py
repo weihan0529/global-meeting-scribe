@@ -141,5 +141,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # API Keys
 # For production, use environment variables instead of hardcoding
 import os
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyAriMbOP2kTr3sfs7U-9kmJady0eRxfGTs')
-HUGGINGFACE_API_KEY = os.getenv('HUGGINGFACE_API_KEY', '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')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY')
