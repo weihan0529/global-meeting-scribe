@@ -1,0 +1,56 @@
+# Django and Web Framework
+Django==5.0.2
+djangorestframework==3.15.2
+django-cors-headers==4.3.1
+
+# Django Channels for WebSocket support
+channels==4.0.0
+channels-redis==4.2.0
+daphne==4.1.0
+
+# AI and Machine Learning
+torch==2.2.0
+torchaudio==2.2.0
+transformers==4.38.2
+google-generativeai==0.8.5
+openai==1.12.0
+pyannote.audio==3.1.1
+soundfile==0.12.1
+pydub==0.25.1
+
+# Audio Processing
+librosa==0.10.1
+numpy==1.24.3
+scipy==1.11.4
+
+# WebSocket and Async
+websockets==12.0
+asyncio-mqtt==0.16.1
+
+# Environment and Configuration
+python-dotenv==1.0.1
+python-decouple==3.8
+
+# Database
+#redis==5.0.1
+
+# Development and Testing
+pytest==7.4.4
+pytest-django==4.7.0
+pytest-asyncio==0.23.5
+
+# Utilities
+requests==2.31.0
+aiohttp==3.9.3
+websocket-client==1.7.0
+
+# Audio Format Support
+ffmpeg-python==0.2.0
+
+# Additional AI Libraries
+sentence-transformers==2.5.1
+sacremoses==0.0.53
+
+# Production
+gunicorn==21.2.0
+uvicorn==0.27.1 
