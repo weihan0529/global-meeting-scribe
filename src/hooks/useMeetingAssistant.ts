@@ -2,150 +2,195 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Transcript, Insight } from '../types';
 
 interface UseMeetingAssistantReturn {
-  // State
   isConnected: boolean;
   isRecording: boolean;
-  transcripts: Transcript[];
-  insights: Insight[];
-  
-  // Actions
+  isProcessing: boolean;
+  meetingActive: boolean;
+  recordings: {
+    transcripts: Transcript[];
+    insights: Insight[];
+    targetLanguage: string;
+  }[];
   connect: () => void;
   disconnect: () => void;
   startRecording: () => Promise<void>;
   stopRecording: () => void;
-  
-  // Status
+  setIsProcessing: (value: boolean) => void;
+  changeTargetLanguage: (lang: string) => void;
   connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error';
   recordingStatus: 'stopped' | 'starting' | 'recording' | 'stopping';
+  resetMeeting: () => void;
+  setRecordings: React.Dispatch<React.SetStateAction<Array<{
+    transcripts: Transcript[];
+    insights: Insight[];
+    targetLanguage: string;
+  }>>>;
+  wsRef: React.MutableRefObject<WebSocket | null>;
 }
 
-export const useMeetingAssistant = (): UseMeetingAssistantReturn & { changeTargetLanguage: (lang: string) => void } => {
-  // State management
+export const useMeetingAssistant = (): UseMeetingAssistantReturn => {
   const [isConnected, setIsConnected] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
-  const [insights, setInsights] = useState<Insight[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [meetingActive, setMeetingActive] = useState(false);
+  const [recordings, setRecordings] = useState<Array<{
+    transcripts: Transcript[];
+    insights: Insight[];
+    targetLanguage: string;
+  }>>([]);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const [recordingStatus, setRecordingStatus] = useState<'stopped' | 'starting' | 'recording' | 'stopping'>('stopped');
 
-  // Refs for persistent instances
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioBufferRef = useRef<Float32Array[]>([]);
+  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reset meeting state
+  const resetMeeting = useCallback(() => {
+    setIsConnected(false);
+    setIsRecording(false);
+    setIsProcessing(false);
+    setMeetingActive(false);
+    setRecordings([]);
+    setConnectionStatus('disconnected');
+    setRecordingStatus('stopped');
+  }, []);
 
   // WebSocket connection management
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      return; // Already connected
+      console.log('[WebSocket] Already open, skipping connect');
+      return;
     }
-
     setConnectionStatus('connecting');
-    
     try {
-      // Connect to Django Channels WebSocket
+      console.log('[WebSocket] Connecting to ws://localhost:8000/ws/meeting/');
       const ws = new WebSocket('ws://localhost:8000/ws/meeting/');
-      
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('[WebSocket] Connection opened');
         setIsConnected(true);
+        setMeetingActive(true);
         setConnectionStatus('connected');
-        
-        // Automatically start recording after successful connection
-        startRecording().catch(error => {
-          console.error('Failed to start recording after connection:', error);
-        });
       };
-
       ws.onmessage = (event) => {
-        // 1. Log the raw data
-        console.log('[FRONTEND<-BACKEND] Raw message received:', event.data);
-        
+        console.log('[WebSocket] Message received:', event.data);
         try {
           const data = JSON.parse(event.data);
-          // 2. Log the parsed object
-          console.log('[FRONTEND] Parsed data object:', data);
-
-          // --- Robust message handling for transcript enrichment ---
           if (data.type === 'preliminary_transcript' && data.data) {
-            // Assign a unique client-side ID
             const transcript = {
               ...data.data,
               id: crypto.randomUUID(),
               timestamp: new Date().toISOString(),
             };
-            setTranscripts(prev => [...prev, transcript]);
+            setRecordings(prev => {
+              if (prev.length === 0) return prev;
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                transcripts: [...updated[updated.length - 1].transcripts, transcript],
+              };
+              return updated;
+            });
           } else if (data.type === 'enriched_transcripts' && Array.isArray(data.data?.enriched_transcripts)) {
-            // Replace the entire transcript list with the enriched transcripts from the backend
-            setTranscripts(data.data.enriched_transcripts);
-            // Optionally handle insights
-            if (Array.isArray(data.insights)) {
-              setInsights(prev => [...prev, ...data.insights]);
-            }
+            setRecordings(prev => {
+              if (prev.length === 0) return prev;
+              const updated = [...prev];
+              // Use recording_id if present, otherwise default to last
+              const recIdx = typeof data.recording_id === 'number' && data.recording_id >= 0 && data.recording_id < updated.length
+                ? data.recording_id
+                : updated.length - 1;
+              updated[recIdx] = {
+                ...updated[recIdx],
+                transcripts: data.data.enriched_transcripts,
+                insights: Array.isArray(data.insights)
+                  ? [...updated[recIdx].insights, ...data.insights]
+                  : updated[recIdx].insights,
+              };
+              return updated;
+            });
+            setIsProcessing(false);
+            setRecordingStatus('stopped');
           } else if (data.type === 'insight') {
-            setInsights(prev => [...prev, data.insight]);
+            setRecordings(prev => {
+              if (prev.length === 0) return prev;
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...updated[updated.length - 1],
+                insights: [...updated[updated.length - 1].insights, data.insight],
+              };
+              return updated;
+            });
+          } else if (data.type === 'processing_started') {
+            setIsProcessing(true);
+            setRecordingStatus('stopped');
           } else if (data.error) {
-            console.error('Backend error:', data.error);
+            setIsProcessing(false);
+            setRecordingStatus('stopped');
+            console.warn('[WebSocket] Error message received:', data.error);
           }
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          setIsProcessing(false);
+          setRecordingStatus('stopped');
+          console.error('[WebSocket] Error parsing message:', error, event.data);
+        }
+        if (processingTimeoutRef.current) {
+          clearTimeout(processingTimeoutRef.current);
+          processingTimeoutRef.current = null;
         }
       };
-
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
+      ws.onclose = (event) => {
+        console.warn('[WebSocket] Connection closed', event);
         setIsConnected(false);
         setConnectionStatus('disconnected');
-        
-        // Stop recording when connection is lost
+        setMeetingActive(false);
         if (isRecording) {
           stopRecording();
         }
       };
-
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        console.error('[WebSocket] Error occurred', error);
         setConnectionStatus('error');
         setIsConnected(false);
+        setMeetingActive(false);
       };
-
       wsRef.current = ws;
     } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
       setConnectionStatus('error');
+      console.error('[WebSocket] Exception during connect:', error);
     }
-  }, []);
+  }, [isRecording]);
 
   const disconnect = useCallback(() => {
+    console.log('[WebSocket] Disconnect called. isRecording:', isRecording);
+    console.trace('[WebSocket] Disconnect stack trace');
     if (isRecording) {
       stopRecording();
     }
-    
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
+      console.log('[WebSocket] Closed and cleared wsRef');
     }
-    
     setIsConnected(false);
     setConnectionStatus('disconnected');
+    setMeetingActive(false);
   }, [isRecording]);
 
-  // Audio recording management
   const startRecording = useCallback(async () => {
+    console.log('[Recording] startRecording called. isRecording:', isRecording, 'wsRef:', wsRef.current);
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.error('Cannot start recording: not connected to WebSocket');
+      console.warn('[Recording] Cannot start: WebSocket not open');
       return;
     }
-
     if (isRecording) {
-      console.warn('Already recording');
+      console.warn('[Recording] Already recording');
       return;
     }
-
     setRecordingStatus('starting');
-
     try {
-      // Request microphone access with specific audio constraints
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           sampleRate: 16000,
@@ -154,119 +199,133 @@ export const useMeetingAssistant = (): UseMeetingAssistantReturn & { changeTarge
           noiseSuppression: true,
         } 
       });
-      
+      console.log('[Recording] Microphone stream obtained', stream);
       streamRef.current = stream;
-
-      // Create AudioContext for high-performance audio processing
-      const audioContext = new AudioContext({
-        sampleRate: 16000,
-        latencyHint: 'interactive'
-      });
-      
+      const audioContext = new AudioContext({ sampleRate: 16000, latencyHint: 'interactive' });
       audioContextRef.current = audioContext;
-
-      // Load the AudioWorklet processor
       await audioContext.audioWorklet.addModule('/audio-processor.js');
-
-      // Create audio source from the stream
       const source = audioContext.createMediaStreamSource(stream);
-
-      // Create AudioWorklet node
       const workletNode = new AudioWorkletNode(audioContext, 'audio-processor', {
         numberOfInputs: 1,
-        numberOfOutputs: 0, // We don't need output, just processing
+        numberOfOutputs: 0,
         channelCount: 1,
         channelCountMode: 'explicit',
         channelInterpretation: 'discrete'
       });
-
-      // Handle audio data from the worklet
+      audioBufferRef.current = [];
       workletNode.port.onmessage = (event) => {
-        if (event.data.type === 'audio_data' && wsRef.current?.readyState === WebSocket.OPEN) {
-          // Send Float32Array data directly as binary
-          const audioBuffer = event.data.data;
-          wsRef.current.send(audioBuffer.buffer);
+        if (event.data.type === 'audio_data') {
+          const audioChunk = event.data.data;
+          audioBufferRef.current.push(audioChunk);
         }
       };
-
       audioWorkletNodeRef.current = workletNode;
-
-      // Connect the audio graph
       source.connect(workletNode);
-      // workletNode.connect(audioContext.destination); // Removed: cannot connect node with 0 outputs
-
-      console.log('Recording started with AudioWorklet');
       setIsRecording(true);
       setRecordingStatus('recording');
-      
+      // Add a new recording entry
+      setRecordings(prev => ([
+        ...prev,
+        { transcripts: [], insights: [], targetLanguage: 'en' }
+      ]));
+      console.log('[Recording] Recording started');
     } catch (error) {
-      console.error('Failed to start recording:', error);
       setRecordingStatus('stopped');
+      console.error('[Recording] Failed to start recording:', error);
       throw error;
     }
   }, [isRecording]);
 
   const stopRecording = useCallback(() => {
+    console.log('[Recording] stopRecording called. isRecording:', isRecording);
     if (!isRecording) {
+      console.warn('[Recording] Not recording, nothing to stop');
       return;
     }
-
     setRecordingStatus('stopping');
-    
-    // Disconnect and cleanup AudioWorklet
     if (audioWorkletNodeRef.current) {
       audioWorkletNodeRef.current.disconnect();
       audioWorkletNodeRef.current = null;
+      console.log('[Recording] AudioWorkletNode disconnected');
     }
-    
-    // Close AudioContext
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close();
       audioContextRef.current = null;
+      console.log('[Recording] AudioContext closed');
     }
-    
-    // Stop all tracks in the stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+      console.log('[Recording] MediaStream tracks stopped');
     }
-    
-    console.log('Recording stopped');
     setIsRecording(false);
     setRecordingStatus('stopped');
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && audioBufferRef.current.length > 0) {
+      setIsProcessing(true);
+      processingTimeoutRef.current = setTimeout(() => {
+        setIsProcessing(false);
+      }, 60000);
+      const totalLength = audioBufferRef.current.reduce((sum, arr) => sum + arr.length, 0);
+      const merged = new Float32Array(totalLength);
+      let offset = 0;
+      for (const arr of audioBufferRef.current) {
+        merged.set(arr, offset);
+        offset += arr.length;
+      }
+      try {
+        wsRef.current.send(merged.buffer);
+        console.log('[Recording] Audio buffer sent to backend. Length:', merged.length);
+      } catch (error) {
+        setIsProcessing(false);
+        if (processingTimeoutRef.current) {
+          clearTimeout(processingTimeoutRef.current);
+          processingTimeoutRef.current = null;
+        }
+        console.error('[Recording] Failed to send audio buffer:', error);
+      }
+      audioBufferRef.current = [];
+    } else {
+      console.warn('[Recording] No audio buffer to send or WebSocket not open');
+    }
   }, [isRecording]);
 
-  // New: Send language change to backend
   const changeTargetLanguage = useCallback((languageName: string) => {
+    setRecordings(prev => {
+      if (prev.length === 0) return prev;
+      const updated = [...prev];
+      updated[updated.length - 1] = {
+        ...updated[updated.length - 1],
+        targetLanguage: languageName,
+      };
+      return updated;
+    });
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ target_language: languageName }));
     }
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       disconnect();
     };
-  }, [disconnect]);
+  }, []); // Only run on mount/unmount
 
   return {
-    // State
     isConnected,
     isRecording,
-    transcripts,
-    insights,
-    
-    // Actions
+    isProcessing,
+    meetingActive,
+    recordings,
     connect,
     disconnect,
     startRecording,
     stopRecording,
-    
-    // Status
+    setIsProcessing,
+    changeTargetLanguage,
     connectionStatus,
     recordingStatus,
-    // New action
-    changeTargetLanguage,
+    resetMeeting,
+    setRecordings,
+    wsRef,
   };
 }; 

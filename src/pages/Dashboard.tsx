@@ -62,100 +62,77 @@ const Dashboard = () => {
       <Header />
       
       <main className="flex-1 container max-w-7xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
+        <h1 className="text-3xl font-bold mb-8">Welcome to Unisono</h1>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          <Card className="md:col-span-2">
-            <CardContent className="pt-6">
-              <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-              <div className="flex gap-4">
-                <Button 
-                  className="w-full sm:w-auto btn-primary"
-                  onClick={handleStartNewMeeting}
-                >
-                  Start New Meeting
-                </Button>
-                <Button 
-                  onClick={() => navigate("/tasks")}
-                  variant="secondary" 
-                  className="w-full sm:w-auto"
-                >
-                  Task Manager
-                </Button>
+        {/* Ready to Start and Supported Languages Section */}
+        <div className="my-12 grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+          <div className="md:col-span-2">
+            <div
+              className="flex items-center justify-between rounded-2xl shadow-md px-10 py-8 mb-10 md:mb-0"
+              style={{
+                background: 'linear-gradient(90deg, #3b82f6 0%, #6366f1 100%)',
+                color: 'white',
+                minHeight: 120,
+                maxWidth: 900,
+                margin: '0 auto',
+              }}
+            >
+              <div>
+                <h2 className="text-2xl font-bold mb-2">Ready to start?</h2>
+                <p className="text-base opacity-90">Launch a new meeting and let Unisono handle the rest.</p>
               </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <h2 className="text-xl font-bold mb-4">Stats</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-muted rounded-md p-4 text-center">
-                  <div className="text-3xl font-bold text-primary">12</div>
-                  <div className="text-sm text-muted-foreground">Meetings</div>
+              <button
+                className="bg-white text-blue-600 font-semibold rounded-lg px-6 py-3 text-base shadow hover:bg-blue-50 transition"
+                onClick={handleStartNewMeeting}
+                style={{ minWidth: 180 }}
+              >
+                Start New Meeting
+              </button>
+            </div>
+          </div>
+          <div>
+            <Card>
+              <CardContent className="pt-6">
+                <h2 className="text-xl font-bold mb-4">Supported Languages</h2>
+                <div className="grid grid-cols-2 gap-y-4 gap-x-8">
+                  <div className="flex items-center space-x-3">
+                    <img src="https://flagcdn.com/w40/gb.png" alt="UK Flag" className="w-8 h-auto rounded-full" />
+                    <span className="font-medium">English</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <img src="https://flagcdn.com/w40/fr.png" alt="France Flag" className="w-8 h-auto rounded-full" />
+                    <span className="font-medium">French</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <img src="https://flagcdn.com/w40/es.png" alt="Spain Flag" className="w-8 h-auto rounded-full" />
+                    <span className="font-medium">Spanish</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <img src="https://flagcdn.com/w40/cn.png" alt="China Flag" className="w-8 h-auto rounded-full" />
+                    <span className="font-medium">Chinese</span>
+                  </div>
                 </div>
-                <div className="bg-muted rounded-md p-4 text-center">
-                  <div className="text-3xl font-bold text-secondary">8h</div>
-                  <div className="text-sm text-muted-foreground">Total Time</div>
-                </div>
-                <div className="bg-muted rounded-md p-4 text-center">
-                  <div className="text-3xl font-bold text-accent">24</div>
-                  <div className="text-sm text-muted-foreground">Tasks</div>
-                </div>
-                <div className="bg-muted rounded-md p-4 text-center">
-                  <div className="text-3xl font-bold">4</div>
-                  <div className="text-sm text-muted-foreground">Languages</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
         
-        <div>
-          <Tabs defaultValue="recent">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">Your Meetings</h2>
-              <TabsList>
-                <TabsTrigger value="recent">Recent</TabsTrigger>
-                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                <TabsTrigger value="saved">Saved</TabsTrigger>
-              </TabsList>
-            </div>
-            
-            <TabsContent value="recent" className="mt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {recentMeetings.map((meeting) => (
-                  <MeetingCard
-                    key={meeting.id}
-                    id={meeting.id}
-                    title={meeting.title}
-                    date={meeting.date}
-                    duration={meeting.duration}
-                    participants={meeting.participants}
-                    languages={meeting.languages}
-                  />
-                ))}
+        {/* How to Use Section */}
+        <div className="my-12">
+          <Card className="max-w-7xl mx-auto">
+            <CardContent className="flex flex-col items-stretch p-12 min-h-[350px]">
+              <div className="mb-8">
+                <h2 className="text-xl font-bold text-left">How to Use?</h2>
               </div>
-            </TabsContent>
-            
-            <TabsContent value="upcoming" className="mt-0">
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No upcoming meetings scheduled.</p>
-                <Button className="mt-4" onClick={handleStartNewMeeting}>
-                  Schedule a Meeting
-                </Button>
+              <div className="flex-1 flex justify-center items-center">
+                <img
+                  src="/Concept Explaination.png"
+                  alt="How to Use Unisono"
+                  style={{ maxWidth: '150%', height: 'auto', minWidth: 400, minHeight: 180 }}
+                />
               </div>
-            </TabsContent>
-            
-            <TabsContent value="saved" className="mt-0">
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No saved meetings yet.</p>
-                <Button className="mt-4" variant="outline">
-                  Browse Recent Meetings
-                </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>

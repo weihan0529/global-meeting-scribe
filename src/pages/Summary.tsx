@@ -205,9 +205,6 @@ const Summary = () => {
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-lg font-bold text-accent">Action Items</h3>
-                  <Link to="/tasks">
-                    <Button variant="outline" size="sm">View All Tasks</Button>
-                  </Link>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 max-h-64 overflow-y-auto pr-2">
                   {meetingData.tasks.map((task) => (
@@ -283,11 +280,6 @@ const Summary = () => {
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-bold text-accent">Action Items</h3>
-                  <div>
-                    <Button variant="outline" size="sm">
-                      Export to Task Manager
-                    </Button>
-                  </div>
                 </div>
                 
                 <div className="space-y-4">

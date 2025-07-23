@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -11,63 +11,36 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import EditableSpeakerName from "./EditableSpeakerName";
+import { Mic, Loader2 } from "lucide-react";
+const recordingGif = "/recording_icon_compressed.gif";
 
 interface Message {
   id: string;
   speaker: string;
   speakerInitials: string;
   text: string;
-  timestamp: Date;
   color: string;
+  detectedLanguage?: string;
 }
 
 interface TranscriptionPanelProps {
   messages: Message[];
   onSpeakerNameChange?: (messageId: string, newName: string) => void;
+  isRecording?: boolean;
+  isProcessing?: boolean;
+  speakerColors?: { [label: string]: string };
 }
 
-const getRandomColor = () => {
-  // Pick a random Tailwind color class or generate a hex color
-  const tailwindColors = [
-    'text-blue-600',
-    'text-emerald-600',
-    'text-amber-600',
-    'text-fuchsia-600',
-    'text-indigo-600',
-    'text-rose-600',
-    'text-purple-600',
-    'text-cyan-600',
-    'text-pink-600',
-    'text-lime-600',
-    'text-orange-600',
-    'text-teal-600',
-    'text-violet-600',
-    'text-yellow-600',
-];
-  return tailwindColors[Math.floor(Math.random() * tailwindColors.length)];
-};
+
 
 const TranscriptionPanel = ({
   messages = [],
   onSpeakerNameChange,
+  isRecording = false,
+  isProcessing = false,
+  speakerColors = {},
 }: TranscriptionPanelProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Persistent color mapping for speaker labels
-  const [speakerColors, setSpeakerColors] = useState<{ [label: string]: string }>({});
-
-  // Assign a color to each new speaker label as it appears
-  useEffect(() => {
-    setSpeakerColors((prev) => {
-      const updated = { ...prev };
-      messages.forEach((msg) => {
-        if (msg.speaker && !updated[msg.speaker]) {
-          updated[msg.speaker] = getRandomColor();
-        }
-      });
-      return updated;
-    });
-  }, [messages]);
 
 
   // Scroll to bottom when new messages arrive
@@ -86,17 +59,27 @@ const TranscriptionPanel = ({
 
   return (
     <div className="flex flex-col h-full border-r">
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-bold">Transcription</h2>
-      </div>
+      {/* Section title and description moved to parent */}
 
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
-          {messages.length > 0 ? (
+          {isProcessing && messages.length === 0 ? (
+            <div className="p-8 flex flex-col items-center justify-center relative">
+              <div className="mb-2 text-5xl text-blue-500">
+                <Loader2 className="animate-spin" />
+              </div>
+              <div className="text-muted-foreground">Processing</div>
+            </div>
+          ) : isRecording && messages.length === 0 ? (
+            <div className="p-8 flex flex-col items-center justify-center relative">
+              <div className="mb-2 text-5xl text-red-500">
+                {/* Replace Mic icon with GIF */}
+                <img src={recordingGif} alt="Recording" style={{ width: 50, height: 50 }} />
+              </div>
+              <div className="text-muted-foreground">Recording</div>
+            </div>
+          ) : messages.length > 0 ? (
             messages.map((message, index) => {
-              const hours = message.timestamp.getHours();
-              const minutes = message.timestamp.getMinutes();
-              const formattedTime = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
               const color = speakerColors[message.speaker] || 'text-gray-600';
 
               return (
@@ -109,12 +92,9 @@ const TranscriptionPanel = ({
 
                       onNameChange={(newName) => handleSpeakerNameChange(message.id, newName)}
                     />
-                    <span className="text-xs text-muted-foreground">
-                      {formattedTime}
-                    </span>
                   </div>
                   <p className="text-sm pl-8">
-                    {message.text} <span className="text-xs text-muted-foreground">(English)</span>
+                    {message.text} <span className="text-xs text-muted-foreground">({message.detectedLanguage ? message.detectedLanguage.charAt(0).toUpperCase() + message.detectedLanguage.slice(1) : 'Unknown'})</span>
                   </p>
                   {index < messages.length - 1 && (
                     <Separator className="my-2" />
@@ -124,7 +104,7 @@ const TranscriptionPanel = ({
             })
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              No transcription available yet. Start speaking when ready.
+              No Transcription available yet. Start recording when ready.
             </div>
           )}
         </div>

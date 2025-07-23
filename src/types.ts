@@ -5,6 +5,7 @@ export interface Transcript {
   original_transcript: string;
   translated_transcript: string;
   timestamp: string;
+  detected_language?: string;
 }
 
 // Insight types based on Gemini API backend response structure
