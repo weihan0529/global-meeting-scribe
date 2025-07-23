@@ -21,6 +21,11 @@ const EditableTitle = ({ title, className = "", onTitleChange }: EditableTitlePr
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
+      if (!currentTitle.trim()) {
+        setCurrentTitle(title); // Reset to previous title
+        setIsEditing(false);
+        return;
+      }
       setIsEditing(false);
       onTitleChange(currentTitle);
     } else if (e.key === "Escape") {
@@ -30,6 +35,11 @@ const EditableTitle = ({ title, className = "", onTitleChange }: EditableTitlePr
   };
 
   const handleBlur = () => {
+    if (!currentTitle.trim()) {
+      setCurrentTitle(title); // Reset to previous title
+      setIsEditing(false);
+      return;
+    }
     setIsEditing(false);
     onTitleChange(currentTitle);
   };

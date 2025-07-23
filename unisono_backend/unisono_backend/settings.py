@@ -49,6 +49,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'assistant.middleware.CorsMiddleware',  # Add CORS middleware
 ]
 
 ROOT_URLCONF = 'unisono_backend.urls'
@@ -141,5 +142,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # API Keys
 # For production, use environment variables instead of hardcoding
 import os
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-HUGGINGFACE_API_KEY = os.environ.get('HUGGINGFACE_API_KEY')
+GEMINI_API_KEY = 'AIzaSyAriMbOP2kTr3sfs7U-9kmJady0eRxfGTs'  # Replace with your actual Gemini API key
+HUGGINGFACE_API_KEY = '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'  # Replace with your actual HuggingFace API key

@@ -1,87 +1,134 @@
-# Welcome to your Lovable project
+# Unisono – Real-Time Meeting Assistant
 
-## Project info
+Unisono (global-meeting-scribe) is a modern, AI-powered meeting assistant that helps you record, transcribe, translate, summarize, and export your meetings with ease.  
+It features a React/TypeScript frontend, a Django/Python backend, and leverages state-of-the-art AI models for speech processing and insights.
 
-**URL**: https://lovable.dev/projects/1b71c47e-d905-452e-836d-045035ff792d
+---
 
-## How can I edit this code?
+## 🚀 Features
 
-There are several ways of editing your application.
+- **Batch Audio Recording & Processing**: Record audio in batches for efficient, resource-friendly transcription and analysis.
+- **Speaker Diarization**: Automatically detects and labels different speakers.
+- **Accurate Transcription**: Uses Whisper for high-quality speech-to-text in multiple languages.
+- **Intelligent Translation**: Translates transcripts into your chosen language, with smart pivoting if direct translation is unavailable.
+- **AI-Powered Summaries & Insights**: Get concise meeting summaries and actionable insights using Google Gemini.
+- **Live Editing**: Edit summaries and speaker names directly in the UI.
+- **PDF Export**: Export meeting notes, summaries, and insights as a branded PDF.
+- **Meeting History**: Save and revisit past meetings, powered by MongoDB.
+- **Multi-language Support**: Transcribe and translate in many languages.
+- **Responsive UI**: Built with React, Tailwind CSS, and shadcn/ui for a seamless experience on all devices.
 
-**Use Lovable**
+---
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/1b71c47e-d905-452e-836d-045035ff792d) and start prompting.
+## 🛠️ Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS, shadcn/ui, jsPDF, html2canvas, Lucide-react
+- **Backend**: Django, Django Channels (WebSocket), Daphne (ASGI), Python
+- **AI Models**: pyannote (diarization), Whisper (transcription), Helsinki-NLP (translation), Google Gemini (insights)
+- **Database**: MongoDB Atlas (via PyMongo)
+- **Communication**: WebSocket (real-time), REST API (CRUD for meetings/history)
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🖥️ Local Development
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Prerequisites
 
-Follow these steps:
+- Node.js & npm
+- Python 3.9+
+- MongoDB Atlas account (or local MongoDB)
+- [HuggingFace account](https://huggingface.co/) (for model access)
+
+### 1. Clone the Repository
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+git clone https://github.com/weihan0529/global-meeting-scribe
+cd global-meeting-scribe
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 2. Install Frontend Dependencies
 
-# Step 3: Install the necessary dependencies.
-npm i
+```sh
+npm install
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### 3. Start the Frontend
+
+```sh
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### 4. Backend Setup
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Create a Python virtual environment and activate it.
+- Install backend dependencies:
 
-**Use GitHub Codespaces**
+```sh
+pip install -r requirements.txt
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **Important:**  
+  Before running the backend, you must manually accept the terms for the required HuggingFace models:
+  1. Visit https://huggingface.co/pyannote/speaker-diarization-3.1 and click "Accept".
+  2. Visit https://huggingface.co/pyannote/segmentation-3.0 and click "Accept".
 
-## What technologies are used for this project?
+- Configure your MongoDB connection string in the backend settings.
 
-This project is built with:
+- Start the backend server:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```sh
+python unisono_backend/manage.py runserver
+# or, for ASGI/WebSocket support:
+python -m daphne unisono_backend.unisono_backend.asgi:application
+```
 
-## How can I deploy this project?
+### 5. Start Using Unisono
 
-Simply open [Lovable](https://lovable.dev/projects/1b71c47e-d905-452e-836d-045035ff792d) and click on Share -> Publish.
+- Open your browser and go to the frontend URL (usually http://localhost:5173).
+- Start a meeting, record audio, and explore all features!
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
+## 🌐 Deployment
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- Deploy the frontend using [Lovable](https://lovable.dev/) or your preferred static hosting.
+- Deploy the backend on a server with Python, Django, and Daphne support.
+- Set up environment variables for production (MongoDB URI, secret keys, etc.).
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+---
 
-## Important Setup Step: Pyannote Model Access
+## 📝 Documentation
 
-Some features require the use of gated models from HuggingFace (e.g., `pyannote/speaker-diarization-3.1`).
+- **Architecture**:  
+  - Batch audio processing pipeline (pyannote, Whisper, Helsinki-NLP, Gemini)
+  - WebSocket for real-time updates
+  - MongoDB for meeting storage
 
-**Before running the backend, you must manually accept the terms for these models:**
+- **Key Features**:  
+  - Batch-based audio upload and processing
+  - Multi-language transcription and translation
+  - Editable summaries and speaker names
+  - PDF export with branding
 
-1. Visit: https://huggingface.co/pyannote/speaker-diarization-3.1
-2. Click "Accept" to accept the user conditions
-3. Also visit: https://huggingface.co/pyannote/segmentation-3.0
-4. Click "Accept" to accept the user conditions
+- **Testing**:  
+  - Unit tests for backend processing
+  - User acceptance survey for feature satisfaction
 
-If you do not do this, model loading will fail with an access error.
+---
+
+## 📄 License
+
+This project is for educational and demonstration purposes.
+
+---
+
+## 🙏 Acknowledgements
+
+- HuggingFace for open-source models
+- Helsinki-NLP, OpenAI/Whisper, Google Gemini
+- shadcn/ui, Tailwind CSS, Vite, React
+
+---
+
+**For more details, see the in-app help or contact the project maintainer.**
 

@@ -9,6 +9,7 @@ from google.generativeai.types import FunctionDeclaration, Tool
 import os
 import logging
 from django.conf import settings
+from .mongodb_client import mongodb_client
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -207,18 +208,12 @@ class MeetingConsumer(AsyncWebsocketConsumer):
         try:
             super().__init__(*args, **kwargs)
             self.audio_processor = get_audio_processor()
-            self.target_language = 'en'
-            # Fast path buffer (short, for instant transcription)
-            self.audio_buffer = []
-            self.buffer_task = None
-            self.buffer_processing_interval = 2  # Fast path: every 2 seconds
-            # Slow path buffer (long, for enrichment)
-            self.long_audio_buffer = []
-            self.enrichment_task = None
-            self.enrichment_interval = 12  # Slow path: every 12 seconds
-            # Store recent transcripts for enrichment
-            self.recent_transcripts = []
-            logger.info("MeetingConsumer initialized with fast/slow path buffering")
+            self.target_languages = {}  # Dict: recording_id -> target_language
+            self.is_processing = False  # Prevent concurrent jobs
+            self.audio_chunks = []  # Store all audio chunks for multi-recording
+            self.meeting_id = None  # Track current meeting ID
+            self.meeting_title = "Untitled Meeting"  # Default meeting title
+            logger.info("MeetingConsumer initialized for batch processing")
         except Exception as e:
             logger.error(f"Failed to initialize MeetingConsumer: {e}")
             self.audio_processor = None
@@ -226,9 +221,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         try:
             await self.accept()
-            self.buffer_task = asyncio.create_task(self._process_buffer_task())
-            self.enrichment_task = asyncio.create_task(self._enrichment_task())
-            logger.info("WebSocket connection established, fast/slow path tasks started")
+            logger.info("[MEETING] User connected and started a meeting (WebSocket accepted)")
         except Exception as e:
             logger.error(f"Failed to establish WebSocket connection: {e}")
             try:
@@ -236,124 +229,18 @@ class MeetingConsumer(AsyncWebsocketConsumer):
             except:
                 pass
 
-    async def _process_buffer_task(self):
-        """
-        Fast path: runs every 2s, does VAD+Whisper, sends preliminary transcript.
-        """
-        try:
-            while True:
-                await asyncio.sleep(self.buffer_processing_interval)
-                if self.audio_buffer:
-                    try:
-                        combined_audio = np.concatenate(self.audio_buffer)
-                        self.audio_buffer = []
-                        if self.audio_processor is not None:
-                            result = await asyncio.to_thread(
-                                self.audio_processor.process_chunk_for_transcription,
-                                audio_chunk=combined_audio
-                            )
-                            if result:
-                                # Store for enrichment
-                                self.recent_transcripts.append(result)
-                                # Also add to long buffer for slow path
-                                self.long_audio_buffer.append(combined_audio)
-                                processed_data = {
-                                    'type': 'preliminary_transcript',
-                                    'data': result
-                                }
-                                logger.info(f"[BACKEND->FRONTEND] Sending fast path data: {processed_data}")
-                                await self.send(text_data=json.dumps(processed_data))
-                                logger.debug("[FAST PATH] Sent preliminary transcript to client")
-                            else:
-                                logger.debug("[FAST PATH] No speech detected in fast path")
-                        else:
-                            logger.warning("AudioProcessor not available for fast path")
-                    except Exception as e:
-                        logger.error(f"Error in fast path processing: {e}")
-                        self.audio_buffer = []
-        except asyncio.CancelledError:
-            logger.info("Fast path buffer processing task cancelled")
-        except Exception as e:
-            logger.error(f"Unexpected error in fast path buffer processing: {e}")
-
-    async def _enrichment_task(self):
-        """
-        Slow path: runs every 12s, does diarization, translation, insights, sends enriched data.
-        """
-        try:
-            while True:
-                logger.info("[SLOW PATH] Enrichment task checking for work...")
-                await asyncio.sleep(self.enrichment_interval)
-                if self.long_audio_buffer and self.recent_transcripts:
-                    try:
-                        # Combine all audio for slow path 
-                        combined_long_audio = np.concatenate(self.long_audio_buffer)
-                        self.long_audio_buffer = []
-                        # Copy and clear recent transcripts for this batch
-                        batch_transcripts = self.recent_transcripts.copy()
-                        self.recent_transcripts = []
-                        if self.audio_processor is not None:
-                            enriched = await asyncio.to_thread(
-                                self.audio_processor.enrich_transcript_batch,
-                                audio_chunk=combined_long_audio,
-                                transcript_list=batch_transcripts,
-                                target_language=self.target_language
-                            )
-                            insights = []
-                            if enriched and enriched.get('enriched_transcripts'):
-                                # Concatenate all original transcripts for Gemini
-                                transcript_text = '\n'.join([
-                                    t.get('original_transcript', '')
-                                    for t in enriched['enriched_transcripts']
-                                ])
-                                if transcript_text.strip():
-                                    insights = await extract_insights_with_gemini(transcript_text)
-                            if enriched:
-                                processed_data = {
-                                    'type': 'enriched_transcripts',
-                                    'data': enriched,
-                                    'insights': insights
-                                }
-                                logger.info(f"[BACKEND->FRONTEND] Sending slow path data: {processed_data}")
-                                await self.send(text_data=json.dumps(processed_data))
-                                logger.debug("[SLOW PATH] Sent enriched transcripts and insights to client")
-                            else:
-                                logger.debug("[SLOW PATH] No enrichment result")
-                        else:
-                            logger.warning("AudioProcessor not available for slow path")
-                    except Exception as e:
-                        logger.error(f"Error in slow path enrichment: {e}")
-                        self.long_audio_buffer = []
-                        self.recent_transcripts = []
-        except asyncio.CancelledError:
-            logger.info("Slow path enrichment task cancelled")
-        except Exception as e:
-            logger.error(f"Unexpected error in slow path enrichment: {e}")
-
     async def disconnect(self, close_code):
-        try:
-            # Cancel both background tasks
-            if self.buffer_task and not self.buffer_task.done():
-                self.buffer_task.cancel()
-                try:
-                    await self.buffer_task
-                except asyncio.CancelledError:
-                    pass
-                logger.info("Fast path buffer processing task cancelled during disconnect")
-            if self.enrichment_task and not self.enrichment_task.done():
-                self.enrichment_task.cancel()
-                try:
-                    await self.enrichment_task
-                except asyncio.CancelledError:
-                    pass
-                logger.info("Slow path enrichment task cancelled during disconnect")
-            logger.info(f"WebSocket connection closed with code: {close_code}")
-        except Exception as e:
-            logger.error(f"Error during disconnect: {e}")
+        logger.info(f"[MEETING] User closed the meeting (WebSocket disconnected, code: {close_code})")
 
     async def receive(self, text_data=None, bytes_data=None):
         try:
             if bytes_data:
+                if self.is_processing:
+                    logger.info("[RECORDING] User attempted to start a new recording while processing is in progress.")
+                    await self.send(text_data=json.dumps({
+                        'error': 'Processing already in progress. Please wait for the current job to finish.'
+                    }))
+                    return
                 if not bytes_data or len(bytes_data) == 0:
                     logger.warning("Empty audio data received")
                     await self.send(text_data=json.dumps({
@@ -371,38 +258,106 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                         'error': 'Invalid audio data format'
                     }))
                     return
-                try:
-                    if self.audio_processor is None:
-                        logger.error("AudioProcessor not available")
-                        await self.send(text_data=json.dumps({
-                            'error': 'Audio processing service not available'
-                        }))
-                        return
-                    # Add to both fast and slow path buffers
-                    self.audio_buffer.append(audio_chunk)
-                except Exception as e:
-                    logger.error(f"Failed to add audio chunk to buffer: {e}")
+                if self.audio_processor is None:
+                    logger.error("AudioProcessor not available")
                     await self.send(text_data=json.dumps({
-                        'error': 'Failed to buffer audio data',
-                        'details': str(e)
+                        'error': 'Audio processing service not available'
                     }))
+                    return
+                logger.info("[RECORDING] User ended a recording and sent audio for processing.")
+                self.is_processing = True
+                
+                # Send immediate acknowledgment to keep connection alive
+                await self.send(text_data=json.dumps({
+                    'type': 'processing_started',
+                    'message': 'Audio processing has started'
+                }))
+                
+                self.audio_chunks.append(audio_chunk)  # Save for per-recording retranslation
+                recording_id = len(self.audio_chunks) - 1
+                # Set default target language for this recording
+                self.target_languages[recording_id] = 'en'
+                # Start background task for processing
+                asyncio.create_task(self.process_audio_in_background(audio_chunk, self.target_languages[recording_id], recording_id))
+
             elif text_data:
                 try:
                     data = json.loads(text_data)
-                    if 'target_language' in data:
+                    if data.get('type') == 'retranslate' and 'target_language' in data:
                         lang_value = data['target_language']
-                        if lang_value in LANGUAGE_CODES:
-                            self.target_language = lang_value
-                        elif lang_value in LANGUAGE_MAP:
-                            self.target_language = LANGUAGE_MAP[lang_value]
+                        recording_id = data.get('recording_id', None)
+                        if recording_id is not None:
+                            if lang_value in LANGUAGE_CODES:
+                                self.target_languages[recording_id] = lang_value
+                            elif lang_value in LANGUAGE_MAP:
+                                self.target_languages[recording_id] = LANGUAGE_MAP[lang_value]
+                            else:
+                                logger.warning(f"Unknown language received: {lang_value}, defaulting to 'en'")
+                                self.target_languages[recording_id] = 'en'
+                        # Re-translate the selected recording
+                        if self.audio_processor and recording_id is not None and 0 <= recording_id < len(self.audio_chunks):
+                            target_lang = self.target_languages.get(recording_id, 'en')
+                            logger.info(f"[RETRANSLATE] Re-translating recording {recording_id} to {target_lang}")
+                            audio_chunk = self.audio_chunks[recording_id]
+                            result = await asyncio.to_thread(self.audio_processor.enrich_transcript_batch, audio_chunk, None, target_lang)
+                            await self.send(text_data=json.dumps({
+                                'type': 'enriched_transcripts',
+                                'data': result,
+                                'recording_id': recording_id
+                            }))
                         else:
-                            logger.warning(f"Unknown language received: {lang_value}, defaulting to 'en'")
-                            self.target_language = 'en'
+                            await self.send(text_data=json.dumps({
+                                'error': 'No audio to retranslate for this recording.'
+                            }))
+                        return
+                    if data.get('type') == 'start_meeting':
+                        # Create a new meeting in MongoDB
+                        meeting_data = {
+                            'title': data.get('title', 'Untitled Meeting'),
+                            'source_language': data.get('source_language', 'en'),
+                            'target_language': data.get('target_language', 'en'),
+                        }
+                        self.meeting_id = mongodb_client.save_meeting(meeting_data)
+                        self.meeting_title = meeting_data['title']
+                        logger.info(f"[MEETING] Created new meeting with ID: {self.meeting_id}")
+                        await self.send(text_data=json.dumps({
+                            'type': 'meeting_created',
+                            'meeting_id': self.meeting_id,
+                            'title': self.meeting_title
+                        }))
+                    elif data.get('type') == 'end_meeting':
+                        # End the current meeting
+                        logger.info(f"[MEETING] Received end_meeting message for meeting: {self.meeting_id}")
+                        if self.meeting_id:
+                            mongodb_client.update_meeting_end(self.meeting_id)
+                            logger.info(f"[MEETING] Ended meeting: {self.meeting_id}")
+                            await self.send(text_data=json.dumps({
+                                'type': 'meeting_ended',
+                                'meeting_id': self.meeting_id
+                            }))
+                        else:
+                            logger.warning("[MEETING] Received end_meeting but no meeting_id found")
+                    elif data.get('type') == 'update_meeting_title':
+                        # Update meeting title
+                        logger.info(f"[MEETING] Received update_meeting_title message: {data.get('title')}")
+                        if self.meeting_id:
+                            mongodb_client.update_meeting_title(self.meeting_id, data.get('title', ''))
+                            self.meeting_title = data.get('title', '')
+                            logger.info(f"[MEETING] Updated title for meeting: {self.meeting_id}")
+                            await self.send(text_data=json.dumps({
+                                'type': 'title_updated',
+                                'title': self.meeting_title
+                            }))
+                        else:
+                            logger.warning("[MEETING] Received update_meeting_title but no meeting_id found")
+                    elif 'target_language' in data:
+                        lang_value = data['target_language']
+                        # This branch is for legacy/whole-meeting language change, keep for compatibility
+                        logger.info(f"[LANGUAGE] Received global target_language change (not per-recording): {lang_value}")
                         await self.send(text_data=json.dumps({
                             'status': 'language_changed',
-                            'target_language': self.target_language
+                            'target_language': lang_value
                         }))
-                        logger.info(f"Target language changed to: {self.target_language}")
                     else:
                         logger.warning(f"Unknown text command received: {data}")
                 except json.JSONDecodeError as e:
@@ -425,3 +380,86 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 }))
             except:
                 pass
+
+    async def process_audio_in_background(self, audio_chunk, target_language, recording_id=None):
+        try:
+            logger.info("[PROCESSING] System started processing the recording (background task).")
+            result = await asyncio.to_thread(self.run_full_pipeline, audio_chunk, target_language)
+            logger.info("[PROCESSING] System finished processing the recording (background task).")
+            # Always include recording_id in the response for frontend mapping
+            if recording_id is not None:
+                result['recording_id'] = recording_id
+                
+                # Save recording to MongoDB if meeting exists
+                if self.meeting_id and result.get('data', {}).get('enriched_transcripts'):
+                    try:
+                        recording_data = {
+                            'meeting_id': self.meeting_id,
+                            'recording_id': str(recording_id),
+                            'transcripts': result['data']['enriched_transcripts'],
+                            'insights': result.get('insights', []),
+                            'target_language': target_language,
+                            'duration': len(audio_chunk) / 16000  # Approximate duration in seconds
+                        }
+                        saved_recording_id = mongodb_client.save_recording(recording_data)
+                        if saved_recording_id:
+                            logger.info(f"[MONGODB] Saved recording {recording_id} with ID: {saved_recording_id}")
+                        else:
+                            logger.warning(f"[MONGODB] Failed to save recording {recording_id}")
+                    except Exception as e:
+                        logger.error(f"[MONGODB] Error saving recording: {e}")
+            
+            await self.send(text_data=json.dumps(result))
+        except Exception as e:
+            logger.error(f"Error in batch processing (background task): {e}")
+            await self.send(text_data=json.dumps({
+                'error': 'Failed to process audio batch',
+                'details': str(e)
+            }))
+        finally:
+            self.is_processing = False
+
+    def run_full_pipeline(self, audio_chunk, target_language):
+        """
+        Sequentially process the audio chunk: transcription, diarization, translation, Gemini insights.
+        Returns a single dictionary with all results.
+        """
+        try:
+            # 1. Transcription + Diarization + Translation (enrich_transcript_batch)
+            enriched = self.audio_processor.enrich_transcript_batch(
+                audio_chunk=audio_chunk,
+                transcript_list=None,  # Let the processor generate transcripts from scratch
+                target_language=target_language
+            )
+            insights = []
+            if enriched and enriched.get('enriched_transcripts'):
+                transcript_text = '\n'.join([
+                    t.get('original_transcript', '')
+                    for t in enriched['enriched_transcripts']
+                ])
+                if transcript_text.strip():
+                    # Gemini insights (sync call in thread)
+                    try:
+                        # Create a new event loop for this thread
+                        import asyncio
+                        try:
+                            loop = asyncio.get_event_loop()
+                        except RuntimeError:
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                        
+                        insights = loop.run_until_complete(extract_insights_with_gemini(transcript_text))
+                    except Exception as e:
+                        logger.error(f"Gemini insights extraction failed: {e}")
+                        insights = []
+            return {
+                'type': 'enriched_transcripts',
+                'data': enriched,
+                'insights': insights
+            }
+        except Exception as e:
+            logger.error(f"Full pipeline failed: {e}")
+            return {
+                'error': 'Full pipeline failed',
+                'details': str(e)
+            }

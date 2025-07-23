@@ -23,11 +23,7 @@ const TaskItem = ({ task, linkToTaskManager = false, onEdit }: TaskItemProps) =>
     <Card className="border-l-4 border-l-accent bg-accent/5">
       <CardContent className="p-3">
         <div className="flex justify-between">
-          {linkToTaskManager ? (
-            <Link to="/tasks" className="text-sm hover:underline">{task.text}</Link>
-          ) : (
             <p className="text-sm">{task.text}</p>
-          )}
           
           {onEdit && (
             <Button

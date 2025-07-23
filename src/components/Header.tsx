@@ -39,49 +39,13 @@ const Header = ({ showLanguageToggle = true }: HeaderProps) => {
           )}
         </Link>
       </div>
-
-      <div className="flex items-center space-x-2 sm:space-x-4">
-        {showLanguageToggle && <LanguageToggle />}
-
-        {isLoggedIn ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="relative rounded-full h-8 w-8 p-0"
-              >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="/placeholder.svg" alt="User" />
-                  <AvatarFallback className="bg-primary text-white">
-                    JD
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem>Subscription</DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setIsLoggedIn(false)}>
-                Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsLoggedIn(true)}
-            className="text-primary hover:text-primary-dark"
-          >
-            Sign In
+      
+      <div className="flex items-center gap-4">
+        <Link to="/meeting-history">
+          <Button variant="ghost" size="sm">
+            Meeting History
           </Button>
-        )}
+        </Link>
       </div>
     </header>
   );
