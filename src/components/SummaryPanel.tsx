@@ -110,78 +110,82 @@ const SummaryPanel = ({
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-bold">Live Summary</h2>
           {!readOnly && (
-            <div className="flex gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="outline" className="text-grey-400 bg-white hover:bg-blue-700 hover:text-white border-grey-600 text-sm py-1 px-2 flex items-center gap-1">
-                    <Plus className="w-4 h-4" /> Add
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem className="text-black bg-white hover:bg-blue-700 hover:text-white focus:bg-blue-700 focus:text-white" onClick={() => setAddType("keyPoint")}>Add Key Point</DropdownMenuItem>
-                  <DropdownMenuItem className="text-black bg-white hover:bg-blue-700 hover:text-white focus:bg-blue-700 focus:text-white" onClick={() => setAddType("decision")}>Add Decision</DropdownMenuItem>
-                  <DropdownMenuItem className="text-black bg-white hover:bg-blue-700 hover:text-white focus:bg-blue-700 focus:text-white" onClick={() => setAddType("task")}>Add Action Item</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="text-grey-400 bg-white hover:bg-blue-700 hover:text-white border-grey-600 text-sm py-1 px-2 flex items-center gap-1">
+                  <Plus className="w-4 h-4" /> Add
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem className="text-black bg-white hover:bg-blue-700 hover:text-white focus:bg-blue-700 focus:text-white" onClick={() => setAddType("keyPoint")}>Add Key Point</DropdownMenuItem>
+                <DropdownMenuItem className="text-black bg-white hover:bg-blue-700 hover:text-white focus:bg-blue-700 focus:text-white" onClick={() => setAddType("decision")}>Add Decision</DropdownMenuItem>
+                <DropdownMenuItem className="text-black bg-white hover:bg-blue-700 hover:text-white focus:bg-blue-700 focus:text-white" onClick={() => setAddType("task")}>Add Action Item</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             </div>
           )}
         </div>
         {addType && !readOnly && (
-          <div className="absolute z-50 mt-10 right-4 w-80 bg-white border rounded shadow-lg p-4 flex flex-col gap-2">
-            <input
-              className="border rounded px-2 py-1 text-sm"
-              placeholder={addType === "keyPoint" ? "Enter key point" : addType === "decision" ? "Enter decision" : "Enter action item"}
-              value={addValue}
-              onChange={e => setAddValue(e.target.value)}
-              autoFocus
-            />
-            {addType === "task" && (
-              <>
+              <div className="absolute z-50 mt-10 right-4 w-80 bg-white border rounded shadow-lg p-4 flex flex-col gap-2">
                 <input
                   className="border rounded px-2 py-1 text-sm"
-                  placeholder="Assignee (optional)"
-                  value={editingTask?.assignee || ''}
-                  onChange={e => setEditingTask({ ...(editingTask || { id: (Date.now() + Math.random()).toString(), text: addValue, source: 'user' }), assignee: e.target.value })}
+                  placeholder={addType === "keyPoint" ? "Enter key point" : addType === "decision" ? "Enter decision" : "Enter action item"}
+                  value={addValue}
+                  onChange={e => setAddValue(e.target.value)}
+                  autoFocus
                 />
-                <input
-                  type="date"
-                  className="border rounded px-2 py-1 text-sm"
-                  value={editingTask?.deadline ? new Date(editingTask.deadline).toISOString().slice(0, 10) : ''}
-                  onChange={e => setEditingTask({ ...(editingTask || { id: (Date.now() + Math.random()).toString(), text: addValue, source: 'user' }), deadline: e.target.value ? new Date(e.target.value) : undefined })}
-                />
-              </>
-            )}
-            <Button size="sm" onClick={() => {
-              if (!addValue.trim()) return;
-              if (addType === "keyPoint" && onKeyPointsChange) {
-                onKeyPointsChange([
-                  ...keyPoints,
-                  { text: addValue, source: 'user' }
-                ]);
-              } else if (addType === "decision" && onDecisionsChange) {
-                onDecisionsChange([
-                  ...decisions,
-                  { text: addValue, source: 'user' }
-                ]);
-              } else if (addType === "task" && onTasksChange) {
-                onTasksChange([
-                  ...tasks,
-                  {
-                    id: (Date.now() + Math.random()).toString(),
-                    text: addValue,
-                    assignee: editingTask?.assignee,
-                    deadline: editingTask?.deadline,
-                    source: 'user'
+                {addType === "task" && (
+                  <>
+                    <input
+                      className="border rounded px-2 py-1 text-sm"
+                      placeholder="Assignee (optional)"
+                      value={editingTask?.assignee || ''}
+                      onChange={e => setEditingTask({ ...(editingTask || { id: (Date.now() + Math.random()).toString(), text: addValue, source: 'user' }), assignee: e.target.value })}
+                    />
+                    <input
+                      type="date"
+                      className="border rounded px-2 py-1 text-sm"
+                      value={(() => {
+                        if (!editingTask?.deadline) return '';
+                        const dateObj = typeof editingTask.deadline === 'string' ? new Date(editingTask.deadline) : editingTask.deadline;
+                        return !isNaN(dateObj.getTime()) ? dateObj.toISOString().slice(0, 10) : '';
+                      })()}
+                      onChange={e => setEditingTask({ ...(editingTask || { id: (Date.now() + Math.random()).toString(), text: addValue, source: 'user' }), deadline: e.target.value ? new Date(e.target.value) : undefined })}
+                    />
+                  </>
+                )}
+                <Button size="sm" onClick={() => {
+                  if (!addValue.trim()) return;
+                  if (addType === "keyPoint" && onKeyPointsChange) {
+                    onKeyPointsChange([
+                      ...keyPoints,
+                      { text: addValue, source: 'user' }
+                    ]);
+                  } else if (addType === "decision" && onDecisionsChange) {
+                    onDecisionsChange([
+                      ...decisions,
+                      { text: addValue, source: 'user' }
+                    ]);
+                  } else if (addType === "task" && onTasksChange) {
+                    onTasksChange([
+                      ...tasks,
+                      {
+                        id: (Date.now() + Math.random()).toString(),
+                        text: addValue,
+                        assignee: editingTask?.assignee,
+                        deadline: editingTask?.deadline,
+                        source: 'user'
+                      }
+                    ]);
                   }
-                ]);
-              }
-              setAddType(null);
-              setAddValue("");
-              setEditingTask(null);
-            }}>Add</Button>
-            <Button size="sm" variant="ghost" onClick={() => { setAddType(null); setAddValue(""); setEditingTask(null); }}>Cancel</Button>
-          </div>
-        )}
+                  setAddType(null);
+                  setAddValue("");
+                  setEditingTask(null);
+                }}>Add</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setAddType(null); setAddValue(""); setEditingTask(null); }}>Cancel</Button>
+              </div>
+            )}
       </div>
       <ScrollArea className="flex-1 p-6" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
         {keyPoints.length === 0 && decisions.length === 0 && tasks.length === 0 ? (
@@ -214,7 +218,7 @@ const SummaryPanel = ({
                         <>
                           <span className="break-words whitespace-pre-line align-middle">{point.text}</span>
                           {!readOnly && (
-                            <Button size="icon" variant="ghost" onClick={() => handleEditKeyPoint(index)} className="align-middle ml-2"><Pencil className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => handleEditKeyPoint(index)} className="align-middle ml-2"><Pencil className="w-4 h-4" /></Button>
                           )}
                         </>
                       )}
@@ -247,7 +251,7 @@ const SummaryPanel = ({
                         <>
                           <span className="break-words whitespace-pre-line align-middle">{decision.text}</span>
                           {!readOnly && (
-                            <Button size="icon" variant="ghost" onClick={() => handleEditDecision(index)} className="align-middle ml-2"><Pencil className="w-4 h-4" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => handleEditDecision(index)} className="align-middle ml-2"><Pencil className="w-4 h-4" /></Button>
                           )}
                         </>
                       )}
@@ -280,7 +284,11 @@ const SummaryPanel = ({
                             <input
                               type="date"
                               className="border rounded px-2 py-1 text-sm"
-                              value={editingTask.deadline ? new Date(editingTask.deadline).toISOString().slice(0, 10) : ''}
+                              value={(() => {
+                                if (!editingTask?.deadline) return '';
+                                const dateObj = typeof editingTask.deadline === 'string' ? new Date(editingTask.deadline) : editingTask.deadline;
+                                return !isNaN(dateObj.getTime()) ? dateObj.toISOString().slice(0, 10) : '';
+                              })()}
                               onChange={e => setEditingTask({ ...editingTask, deadline: e.target.value ? new Date(e.target.value) : undefined })}
                             />
                             <div className="flex gap-2 justify-end">
@@ -292,7 +300,7 @@ const SummaryPanel = ({
                           <div className="flex items-center gap-2 w-full">
                             <span className="break-words whitespace-pre-line flex-1">{task.text}</span>
                             {!readOnly && (
-                              <Button size="icon" variant="ghost" onClick={() => setEditingTask(task)}><Pencil className="w-4 h-4" /></Button>
+                            <Button size="icon" variant="ghost" onClick={() => setEditingTask(task)}><Pencil className="w-4 h-4" /></Button>
                             )}
                           </div>
                         )}
@@ -300,7 +308,10 @@ const SummaryPanel = ({
                         {(!editingTask || editingTask.id !== task.id) && (
                           <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
                             {task.assignee && <span>Assignee: {task.assignee}</span>}
-                            {task.deadline && <span>Due: {format(task.deadline, 'MMM d, yyyy')}</span>}
+                            {task.deadline && (() => {
+                              const dateObj = typeof task.deadline === 'string' ? new Date(task.deadline) : task.deadline;
+                              return !isNaN(dateObj.getTime()) ? <span>Due: {format(dateObj, 'MMM d, yyyy')}</span> : null;
+                            })()}
                           </div>
                         )}
                       </div>
@@ -316,4 +327,4 @@ const SummaryPanel = ({
   );
 };
 
-export default SummaryPanel; 
+export default SummaryPanel;

@@ -131,6 +131,7 @@ async def extract_insights_with_gemini(transcript_text: str) -> list:
         List of extracted insights
     """
     try:
+        logger.info(f"[GEMINI] Starting insights extraction for transcript: {transcript_text[:100]}...")
         # Check if API key is configured
         api_key = getattr(settings, 'GEMINI_API_KEY', None)
         if not api_key:
@@ -151,6 +152,7 @@ async def extract_insights_with_gemini(transcript_text: str) -> list:
         Please extract any relevant insights from this conversation.
         """
         
+        logger.info(f"[GEMINI] Making API call with prompt: {prompt[:100]}...")
         # Make API call with function calling
         response = await asyncio.to_thread(
             model.generate_content,
@@ -162,6 +164,7 @@ async def extract_insights_with_gemini(transcript_text: str) -> list:
             )
         )
         
+        logger.info(f"[GEMINI] Received response: {response}")
         # Parse the response
         insights = []
         
@@ -178,6 +181,8 @@ async def extract_insights_with_gemini(transcript_text: str) -> list:
                         function_name = function_call.name
                         function_args = function_call.args
                         
+                        logger.info(f"[GEMINI] Found function call: {function_name} with args: {function_args}")
+                        
                         # Create insight object
                         insight = {
                             "type": "insight",
@@ -188,7 +193,12 @@ async def extract_insights_with_gemini(transcript_text: str) -> list:
                         }
                         
                         insights.append(insight)
+            else:
+                logger.warning("[GEMINI] No function calls found in response")
+        else:
+            logger.warning("[GEMINI] No candidates or content in response")
         
+        logger.info(f"[GEMINI] Final insights: {insights}")
         return insights
         
     except Exception as e:
@@ -300,6 +310,41 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                             logger.info(f"[RETRANSLATE] Re-translating recording {recording_id} to {target_lang}")
                             audio_chunk = self.audio_chunks[recording_id]
                             result = await asyncio.to_thread(self.audio_processor.enrich_transcript_batch, audio_chunk, None, target_lang)
+                            
+                            # Update the recording in the database with the new translation
+                            if self.meeting_id and result.get('enriched_transcripts'):
+                                logger.info(f"[RETRANSLATE] Attempting to update database for recording {recording_id}")
+                                try:
+                                    # Find the recording by its recording_id field, not by array index
+                                    existing_recording = mongodb_client.get_recording_by_recording_id(self.meeting_id, str(recording_id))
+                                    if existing_recording:
+                                        logger.info(f"[RETRANSLATE] Found recording in database: {existing_recording['_id']}")
+                                        # Update the transcripts with new translations
+                                        updated_transcripts = result['enriched_transcripts']
+                                        logger.info(f"[RETRANSLATE] Updated transcripts: {updated_transcripts}")
+                                        
+                                        # Update the recording in database
+                                        success = mongodb_client.update_recording_transcripts(
+                                            existing_recording['_id'], 
+                                            updated_transcripts, 
+                                            target_lang
+                                        )
+                                        if success:
+                                            logger.info(f"[RETRANSLATE] Successfully updated recording {recording_id} in database with {target_lang} translation")
+                                        else:
+                                            logger.error(f"[RETRANSLATE] Failed to update recording {recording_id} in database")
+                                    else:
+                                        logger.warning(f"[RETRANSLATE] Could not find recording with recording_id {recording_id} in database")
+                                        # Debug: let's see what recordings exist for this meeting
+                                        all_recordings = mongodb_client.get_recordings_by_meeting_id(self.meeting_id)
+                                        logger.info(f"[RETRANSLATE] All recordings for meeting {self.meeting_id}: {[r.get('recording_id') for r in all_recordings]}")
+                                except Exception as e:
+                                    logger.error(f"[RETRANSLATE] Error updating recording in database: {e}")
+                                    import traceback
+                                    logger.error(f"[RETRANSLATE] Full traceback: {traceback.format_exc()}")
+                            else:
+                                logger.warning(f"[RETRANSLATE] No meeting_id or enriched_transcripts found. meeting_id: {self.meeting_id}, result: {result}")
+                            
                             await self.send(text_data=json.dumps({
                                 'type': 'enriched_transcripts',
                                 'data': result,
@@ -350,6 +395,33 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                             }))
                         else:
                             logger.warning("[MEETING] Received update_meeting_title but no meeting_id found")
+                    elif data.get('type') == 'save_manual_insights':
+                        try:
+                            insights_data = data.get('insights', {})
+                            if self.meeting_id and insights_data:
+                                # Save manual insights to MongoDB
+                                manual_insights = {
+                                    'meeting_id': self.meeting_id,
+                                    'keyPoints': insights_data.get('keyPoints', []),
+                                    'decisions': insights_data.get('decisions', []),
+                                    'tasks': insights_data.get('tasks', []),
+                                    'timestamp': datetime.now().isoformat()
+                                }
+                                # You can create a new collection for manual insights or add to existing meeting
+                                # For now, let's add it to the meeting document
+                                mongodb_client.save_manual_insights(manual_insights)
+                                logger.info(f"[MANUAL_INSIGHTS] Saved manual insights for meeting {self.meeting_id}")
+                                await self.send(text_data=json.dumps({
+                                    'type': 'manual_insights_saved',
+                                    'message': 'Manual insights saved successfully'
+                                }))
+                            else:
+                                logger.warning("[MANUAL_INSIGHTS] No meeting ID or insights data provided")
+                        except Exception as e:
+                            logger.error(f"Error saving manual insights: {e}")
+                            await self.send(text_data=json.dumps({
+                                'error': 'Failed to save manual insights'
+                            }))
                     elif 'target_language' in data:
                         lang_value = data['target_language']
                         # This branch is for legacy/whole-meeting language change, keep for compatibility
@@ -401,6 +473,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                             'target_language': target_language,
                             'duration': len(audio_chunk) / 16000  # Approximate duration in seconds
                         }
+                        logger.info(f"[MONGODB] Saving recording with insights: {recording_data['insights']}")
                         saved_recording_id = mongodb_client.save_recording(recording_data)
                         if saved_recording_id:
                             logger.info(f"[MONGODB] Saved recording {recording_id} with ID: {saved_recording_id}")
@@ -440,6 +513,7 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                 if transcript_text.strip():
                     # Gemini insights (sync call in thread)
                     try:
+                        logger.info(f"[INSIGHTS] Extracting AI insights from transcript: {transcript_text[:100]}...")
                         # Create a new event loop for this thread
                         import asyncio
                         try:
@@ -449,9 +523,13 @@ class MeetingConsumer(AsyncWebsocketConsumer):
                             asyncio.set_event_loop(loop)
                         
                         insights = loop.run_until_complete(extract_insights_with_gemini(transcript_text))
+                        logger.info(f"[INSIGHTS] Extracted {len(insights)} AI insights: {insights}")
                     except Exception as e:
                         logger.error(f"Gemini insights extraction failed: {e}")
                         insights = []
+                else:
+                    logger.warning("[INSIGHTS] No transcript text to extract insights from")
+                    insights = []
             return {
                 'type': 'enriched_transcripts',
                 'data': enriched,

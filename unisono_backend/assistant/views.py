@@ -43,10 +43,15 @@ def get_meeting_detail(request, meeting_id):
         # Get recordings for this meeting
         recordings = mongodb_client.get_recordings_by_meeting_id(meeting_id)
         
+        # Get manual insights for this meeting
+        manual_insights = mongodb_client.get_manual_insights(meeting_id)
+        logger.info(f"Retrieved manual insights for meeting {meeting_id}: {manual_insights}")
+        
         return JsonResponse({
             'success': True,
             'meeting': meeting,
-            'recordings': recordings
+            'recordings': recordings,
+            'manual_insights': manual_insights
         })
     except Exception as e:
         logger.error(f"Error getting meeting detail: {e}")

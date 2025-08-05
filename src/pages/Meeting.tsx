@@ -213,9 +213,62 @@ const Meeting = () => {
   }, [recordings]);
 
   // Handlers for user additions/edits
-  const handleKeyPointsChange = (items: { text: string; source: 'ai' | 'user' }[]) => setKeyPoints(items);
-  const handleDecisionsChange = (items: { text: string; source: 'ai' | 'user' }[]) => setDecisions(items);
-  const handleTasksChange = (items: { id: string; text: string; assignee?: string; deadline?: Date; source: 'ai' | 'user' }[]) => setTasks(items);
+  const handleKeyPointsChange = (items: { text: string; source: 'ai' | 'user' }[]) => {
+    setKeyPoints(items);
+    // Send manual insights to backend
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const manualInsights = items.filter(item => item.source === 'user');
+      if (manualInsights.length > 0) {
+        console.log('[MANUAL_INSIGHTS] Sending keyPoints:', manualInsights);
+        wsRef.current.send(JSON.stringify({
+          type: 'save_manual_insights',
+          insights: {
+            keyPoints: manualInsights,
+            decisions: decisions.filter(d => d.source === 'user'),
+            tasks: tasks.filter(t => t.source === 'user')
+          }
+        }));
+      }
+    }
+  };
+
+  const handleDecisionsChange = (items: { text: string; source: 'ai' | 'user' }[]) => {
+    setDecisions(items);
+    // Send manual insights to backend
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const manualInsights = items.filter(item => item.source === 'user');
+      if (manualInsights.length > 0) {
+        console.log('[MANUAL_INSIGHTS] Sending decisions:', manualInsights);
+        wsRef.current.send(JSON.stringify({
+          type: 'save_manual_insights',
+          insights: {
+            keyPoints: keyPoints.filter(kp => kp.source === 'user'),
+            decisions: manualInsights,
+            tasks: tasks.filter(t => t.source === 'user')
+          }
+        }));
+      }
+    }
+  };
+
+  const handleTasksChange = (items: { id: string; text: string; assignee?: string; deadline?: Date; source: 'ai' | 'user' }[]) => {
+    setTasks(items);
+    // Send manual insights to backend
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const manualInsights = items.filter(item => item.source === 'user');
+      if (manualInsights.length > 0) {
+        console.log('[MANUAL_INSIGHTS] Sending tasks:', manualInsights);
+        wsRef.current.send(JSON.stringify({
+          type: 'save_manual_insights',
+          insights: {
+            keyPoints: keyPoints.filter(kp => kp.source === 'user'),
+            decisions: decisions.filter(d => d.source === 'user'),
+            tasks: manualInsights
+          }
+        }));
+      }
+    }
+  };
 
   // Gather all speakers for summary
   const speakers = recordings.flatMap((rec, recIdx) => rec.transcripts.map((transcript, idx) => ({
@@ -257,9 +310,30 @@ const Meeting = () => {
   const handleEndMeeting = () => {
     console.log('[UI] handleEndMeeting called');
     
+    // Send all manual insights before ending the meeting
+    const sendAllManualInsights = () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        const allManualInsights = {
+          keyPoints: keyPoints.filter(kp => kp.source === 'user'),
+          decisions: decisions.filter(d => d.source === 'user'),
+          tasks: tasks.filter(t => t.source === 'user')
+        };
+        
+        console.log('[MANUAL_INSIGHTS] Sending all manual insights before ending meeting:', allManualInsights);
+        
+        wsRef.current.send(JSON.stringify({
+          type: 'save_manual_insights',
+          insights: allManualInsights
+        }));
+      }
+    };
+    
     // Send meeting end message to backend before disconnecting
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       console.log('[UI] Sending end_meeting message');
+      
+      // Send all manual insights first
+      sendAllManualInsights();
       
       // Send the message and wait for it to be sent before disconnecting
       try {
@@ -278,7 +352,7 @@ const Meeting = () => {
       }
     } else {
       console.log('[UI] WebSocket not open, disconnecting immediately');
-      disconnect();
+    disconnect();
     }
     
     toast({
@@ -395,10 +469,11 @@ const Meeting = () => {
       const contentWidth = pageWidth - (2 * margin);
       let yPosition = margin;
 
-      // Helper to add logo to top right of current page
+      // Helper to add logo to top right of current page (removed for now due to base64 issues)
       const addLogoTopRight = () => {
-        const logoSize = 35;
-        pdf.addImage(UNISONO_LOGO_BASE64, 'PNG', pageWidth - margin - logoSize, margin, logoSize, logoSize);
+        // Temporarily disabled due to base64 image format issues
+        // const logoSize = 35;
+        // pdf.addImage(UNISONO_LOGO_BASE64, 'PNG', pageWidth - margin - logoSize, margin, logoSize, logoSize);
       };
       addLogoTopRight();
 
@@ -493,121 +568,127 @@ const Meeting = () => {
         // Horizontal line between recordings (except after last recording)
         if (recIdx < recordings.length - 1) {
           yPosition += 10;
-          pdf.setDrawColor(100);
           pdf.setLineWidth(1);
+          pdf.setDrawColor(100);
           pdf.line(margin, yPosition, pageWidth - margin, yPosition);
           yPosition += 20;
         }
       }
-      // Horizontal line after all recordings
-      yPosition += 10;
-      pdf.setDrawColor(100);
-      pdf.setLineWidth(1);
-      pdf.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 40;
 
-      // --- Live Summary (All Insights) Section ---
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Live Summary', margin, yPosition);
-      yPosition += 25;
+      // Add insights section
+      if (yPosition > pageHeight - 200) {
+        pdf.addPage();
+        yPosition = margin;
+        addLogoTopRight();
+      }
 
       // Key Points
       if (keyPoints.length > 0) {
-        pdf.setFontSize(13);
+        pdf.setFontSize(16);
         pdf.setFont('helvetica', 'bold');
         pdf.text('Key Points:', margin, yPosition);
-        yPosition += 18;
+        yPosition += 25;
+        pdf.setFontSize(11);
         pdf.setFont('helvetica', 'normal');
-        keyPoints.forEach((kp, idx) => {
-          const lines = pdf.splitTextToSize(`• ${kp.text}`, contentWidth);
-          pdf.text(lines, margin + 10, yPosition);
-          yPosition += lines.length * 15;
-          if (yPosition > pageHeight - 50) { pdf.addPage(); yPosition = margin; }
-        });
-        yPosition += 8;
+        for (const point of keyPoints) {
+          if (yPosition > pageHeight - 100) {
+            pdf.addPage();
+            yPosition = margin;
+            addLogoTopRight();
+          }
+          const pointText = `• ${point.text} (${point.source})`;
+          const pointLines = pdf.splitTextToSize(pointText, contentWidth);
+          pdf.text(pointLines, margin, yPosition);
+          yPosition += (pointLines.length * 15) + 5;
+        }
+        yPosition += 10;
       }
+
       // Decisions
       if (decisions.length > 0) {
-        pdf.setFontSize(13);
+        if (yPosition > pageHeight - 150) {
+          pdf.addPage();
+          yPosition = margin;
+          addLogoTopRight();
+        }
+        pdf.setFontSize(16);
         pdf.setFont('helvetica', 'bold');
-        pdf.text('Decisions Made:', margin, yPosition);
-        yPosition += 18;
+        pdf.text('Decisions:', margin, yPosition);
+        yPosition += 25;
+        pdf.setFontSize(11);
         pdf.setFont('helvetica', 'normal');
-        decisions.forEach((d, idx) => {
-          const lines = pdf.splitTextToSize(`• ${d.text}`, contentWidth);
-          pdf.text(lines, margin + 10, yPosition);
-          yPosition += lines.length * 15;
-          if (yPosition > pageHeight - 50) { pdf.addPage(); yPosition = margin; }
-        });
-        yPosition += 8;
+        for (const decision of decisions) {
+          if (yPosition > pageHeight - 100) {
+            pdf.addPage();
+            yPosition = margin;
+            addLogoTopRight();
+          }
+          const decisionText = `• ${decision.text} (${decision.source})`;
+          const decisionLines = pdf.splitTextToSize(decisionText, contentWidth);
+          pdf.text(decisionLines, margin, yPosition);
+          yPosition += (decisionLines.length * 15) + 5;
+        }
+        yPosition += 10;
       }
+
       // Action Items
       if (tasks.length > 0) {
-        pdf.setFontSize(13);
+        if (yPosition > pageHeight - 150) {
+          pdf.addPage();
+          yPosition = margin;
+          addLogoTopRight();
+        }
+        pdf.setFontSize(16);
         pdf.setFont('helvetica', 'bold');
         pdf.text('Action Items:', margin, yPosition);
-        yPosition += 18;
+        yPosition += 25;
+        pdf.setFontSize(11);
         pdf.setFont('helvetica', 'normal');
-        tasks.forEach((t, idx) => {
-          // Main action item text
-          const lines = pdf.splitTextToSize(`• ${t.text}`, contentWidth);
-          pdf.text(lines, margin + 10, yPosition);
-          yPosition += lines.length * 15;
-
-          // Assignee and due date (if present)
-          let details = [];
-          if (t.assignee) details.push(`Assignee: ${t.assignee}`);
-          if (t.deadline) {
-            const dateStr = typeof t.deadline === 'string'
-              ? new Date(t.deadline).toLocaleDateString()
-              : t.deadline.toLocaleDateString();
-            details.push(`Due: ${dateStr}`);
+        for (const task of tasks) {
+          if (yPosition > pageHeight - 100) {
+            pdf.addPage();
+            yPosition = margin;
+            addLogoTopRight();
           }
-          if (details.length > 0) {
-            pdf.setFontSize(11);
-            pdf.setFont('helvetica', 'italic');
-            pdf.text(details.join('   '), margin + 30, yPosition);
-            yPosition += 15;
-            pdf.setFontSize(13);
-            pdf.setFont('helvetica', 'normal');
+          let taskText = `• ${task.text} (${task.source})`;
+          if (task.assignee) {
+            taskText += ` - Assignee: ${task.assignee}`;
           }
-
-          if (yPosition > pageHeight - 50) { pdf.addPage(); yPosition = margin; }
-        });
-        yPosition += 8;
+          if (task.deadline) {
+            taskText += ` - Due: ${task.deadline.toLocaleDateString()}`;
+          }
+          const taskLines = pdf.splitTextToSize(taskText, contentWidth);
+          pdf.text(taskLines, margin, yPosition);
+          yPosition += (taskLines.length * 15) + 5;
+        }
+        yPosition += 10;
       }
-      // --- End Live Summary ---
 
-      // Thank you message and logo (as before)
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      const thankYou = 'Thank you for using Unisono!';
-      const thankYouWidth = pdf.getTextWidth(thankYou);
-      pdf.text(thankYou, (pageWidth - thankYouWidth) / 2, yPosition);
-      yPosition += 30;
+      // Thank you message
+      if (yPosition > pageHeight - 100) {
+        pdf.addPage();
+        yPosition = margin;
+        addLogoTopRight();
+      }
       pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      const feedback = 'If you have any feedback or suggestions, please email us at jordangan0710@gmail.com.';
-      const feedbackWidth = pdf.getTextWidth(feedback);
-      pdf.text(feedback, (pageWidth - feedbackWidth) / 2, yPosition);
-      yPosition += 30;
-      // Centered logo below thank you message
-      const logoSizeEnd = 80;
-      pdf.addImage(UNISONO_LOGO_BASE64, 'PNG', (pageWidth - logoSizeEnd) / 2, yPosition, logoSizeEnd, logoSizeEnd);
-      yPosition += logoSizeEnd + 20;
+      pdf.setFont('helvetica', 'italic');
+      pdf.text('Thank you for using Unisono!', margin, yPosition);
+      yPosition += 20;
+      pdf.text('Generated by Unisono Meeting Assistant', margin, yPosition);
+
       // Save the PDF
-      pdf.save(`${meetingTitle || 'meeting'}_${now.toISOString().split('T')[0]}.pdf`);
+      pdf.save(`${meetingTitle || 'meeting'}_transcript.pdf`);
+      
       toast({
-        title: 'Exported!',
-        description: 'Your meeting has been exported as a PDF with all content.',
+        title: "Export successful",
+        description: "PDF has been generated and downloaded.",
       });
     } catch (error) {
       console.error('Export failed:', error);
       toast({
-        title: 'Export failed',
-        description: 'Failed to generate PDF. Please try again.',
-        variant: 'destructive',
+        title: "Export failed",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
       });
     }
   };

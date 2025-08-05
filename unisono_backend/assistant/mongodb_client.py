@@ -73,23 +73,110 @@ class MongoDBClient:
             logger.error(f"❌ Failed to update meeting end: {e}")
             return False
 
-    def update_meeting_title(self, meeting_id: str, title: str):
-        """Update meeting title"""
+    def update_meeting_title(self, meeting_id: str, new_title: str) -> bool:
+        """Update the title of a meeting."""
         try:
             if self.meetings_collection is None:
-                if not self.connect():
-                    return False
+                logger.error("MongoDB collection not initialized")
+                return False
             
             from bson import ObjectId
             result = self.meetings_collection.update_one(
                 {'_id': ObjectId(meeting_id)},
-                {'$set': {'title': title}}
+                {'$set': {'title': new_title}}
             )
-            logger.info(f"✅ Meeting {meeting_id} title updated to: {title}")
             return result.modified_count > 0
         except Exception as e:
-            logger.error(f"❌ Failed to update meeting title: {e}")
+            logger.error(f"Error updating meeting title: {e}")
             return False
+
+    def save_manual_insights(self, insights_data: dict) -> str:
+        """Save manual insights to a separate collection."""
+        try:
+            if self.db is None:
+                if not self.connect():
+                    return None
+            
+            # Use a separate collection for manual insights
+            insights_collection = self.db.manual_insights
+            
+            # Add timestamp if not present
+            if 'timestamp' not in insights_data:
+                insights_data['timestamp'] = datetime.now().isoformat()
+            
+            result = insights_collection.insert_one(insights_data)
+            logger.info(f"Saved manual insights with ID: {result.inserted_id}")
+            return str(result.inserted_id)
+        except Exception as e:
+            logger.error(f"Error saving manual insights: {e}")
+            return None
+
+    def get_manual_insights(self, meeting_id: str) -> dict:
+        """Get manual insights for a meeting."""
+        try:
+            if self.db is None:
+                if not self.connect():
+                    return {}
+            
+            insights_collection = self.db.manual_insights
+            # Get all manual insights for this meeting
+            all_insights = list(insights_collection.find({'meeting_id': meeting_id}))
+            
+            if all_insights:
+                # Aggregate all insights from all documents
+                aggregated_insights = {
+                    'meeting_id': meeting_id,
+                    'keyPoints': [],
+                    'decisions': [],
+                    'tasks': [],
+                    'timestamp': all_insights[0].get('timestamp', '')  # Use timestamp from first document
+                }
+                
+                # Combine all insights from all documents
+                for insight_doc in all_insights:
+                    if 'keyPoints' in insight_doc:
+                        aggregated_insights['keyPoints'].extend(insight_doc['keyPoints'])
+                    if 'decisions' in insight_doc:
+                        aggregated_insights['decisions'].extend(insight_doc['decisions'])
+                    if 'tasks' in insight_doc:
+                        aggregated_insights['tasks'].extend(insight_doc['tasks'])
+                
+                # Deduplicate insights based on text content
+                seen_keypoints = set()
+                seen_decisions = set()
+                seen_tasks = set()
+                
+                # Deduplicate key points
+                unique_keypoints = []
+                for kp in aggregated_insights['keyPoints']:
+                    if kp['text'] not in seen_keypoints:
+                        seen_keypoints.add(kp['text'])
+                        unique_keypoints.append(kp)
+                aggregated_insights['keyPoints'] = unique_keypoints
+                
+                # Deduplicate decisions
+                unique_decisions = []
+                for decision in aggregated_insights['decisions']:
+                    if decision['text'] not in seen_decisions:
+                        seen_decisions.add(decision['text'])
+                        unique_decisions.append(decision)
+                aggregated_insights['decisions'] = unique_decisions
+                
+                # Deduplicate tasks
+                unique_tasks = []
+                for task in aggregated_insights['tasks']:
+                    task_key = f"{task['text']}_{task.get('assignee', '')}_{task.get('deadline', '')}"
+                    if task_key not in seen_tasks:
+                        seen_tasks.add(task_key)
+                        unique_tasks.append(task)
+                aggregated_insights['tasks'] = unique_tasks
+                
+                logger.info(f"Aggregated {len(all_insights)} manual insights documents for meeting {meeting_id}")
+                return aggregated_insights
+            return {}
+        except Exception as e:
+            logger.error(f"Error getting manual insights: {e}")
+            return {}
 
     def delete_meeting(self, meeting_id: str):
         """Delete a meeting and all its recordings"""
@@ -198,6 +285,64 @@ class MongoDBClient:
         except Exception as e:
             logger.error(f"❌ Failed to get recordings for meeting {meeting_id}: {e}")
             return []
+
+    def get_recording_by_recording_id(self, meeting_id: str, recording_id: str) -> Optional[Dict]:
+        """Get a specific recording by its recording_id field"""
+        try:
+            if self.recordings_collection is None:
+                if not self.connect():
+                    return None
+            
+            logger.info(f"[MONGODB] Searching for recording with meeting_id: {meeting_id}, recording_id: {recording_id}")
+            recording = self.recordings_collection.find_one({
+                'meeting_id': meeting_id,
+                'recording_id': recording_id
+            })
+            
+            if recording:
+                logger.info(f"[MONGODB] Found recording: {recording.get('_id')}")
+                # Convert ObjectId to string for JSON serialization
+                recording['_id'] = str(recording['_id'])
+                if 'created_at' in recording:
+                    recording['created_at'] = recording['created_at'].isoformat()
+            else:
+                logger.warning(f"[MONGODB] No recording found with meeting_id: {meeting_id}, recording_id: {recording_id}")
+            
+            return recording
+        except Exception as e:
+            logger.error(f"❌ Failed to get recording {recording_id} for meeting {meeting_id}: {e}")
+            return None
+
+    def update_recording_transcripts(self, recording_id: str, updated_transcripts: List[Dict], target_language: str) -> bool:
+        """Update the transcripts and target language for a specific recording"""
+        try:
+            if self.recordings_collection is None:
+                if not self.connect():
+                    return False
+            
+            logger.info(f"[MONGODB] Updating recording {recording_id} with target_language: {target_language}")
+            logger.info(f"[MONGODB] Updated transcripts: {updated_transcripts}")
+            
+            from bson import ObjectId
+            result = self.recordings_collection.update_one(
+                {'_id': ObjectId(recording_id)},
+                {
+                    '$set': {
+                        'transcripts': updated_transcripts,
+                        'target_language': target_language
+                    }
+                }
+            )
+            
+            if result.modified_count > 0:
+                logger.info(f"✅ Updated recording {recording_id} with new transcripts and target language {target_language}")
+                return True
+            else:
+                logger.warning(f"❌ No recording found with ID {recording_id} to update")
+                return False
+        except Exception as e:
+            logger.error(f"❌ Failed to update recording {recording_id}: {e}")
+            return False
 
 # Global MongoDB client instance
 mongodb_client = MongoDBClient() 
